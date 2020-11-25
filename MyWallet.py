@@ -52,18 +52,20 @@ def PSWaction(row=0,act=None):
     if act == "send":
         #WindX['form_widgets'][row] = [sv_fieldname, sv_value, bdelete.b, ef, ev, bsend.b]
         #                              0             1         2          3   4   5    
-        t = 3
+        t = 30
         while t:
             WindX['e_status'].config(text="Send ["+ WindX['form_widgets'][row][0].get() +"] in " + str(t) + " seconds ...")
+            WindX['e_status_3'].config(text=str(t))
             WindX['main'].update()
-            time.sleep(1)
+            time.sleep(0.1)
             t = t - 1
         WindX['e_status'].config(text="Sending ["+ WindX['form_widgets'][row][0].get() +"] now ...")
+        WindX['e_status_3'].config(text=str(t))
         SendString(WindX['form_widgets'][row][1].get())
 
     elif act == "delete":
         #delete the row
-        for i in range(2,len(WindX['form_widgets'][row])):
+        for i in range(3,len(WindX['form_widgets'][row])):
             #print(WindX['form_widgets'][row][i])
             WindX['form_widgets'][row][i].grid_remove()
         del WindX['form_widgets'][row]
@@ -78,29 +80,37 @@ def PSWaction(row=0,act=None):
         }   
 
         n = 0
-        for irow in WindX['form_widgets']:            
+        for irow in WindX['form_widgets']:    #[sv_fieldname,sv_value, bdelete.b, ef, ev, bsend.b, sv_fieldnameShort, efs]        
             if WindX['form_widgets'][irow][0].get() and WindX['form_widgets'][irow][1].get():
                 n +=1
+                short = WindX['form_widgets'][irow][2].get()
+                if not short:
+                    short = WindX['form_widgets'][irow][0].get()
                 data[n] = {
                     'field_name' : WindX['form_widgets'][irow][0].get(),
-                    'field_value': WindX['form_widgets'][irow][1].get()
+                    'field_value': WindX['form_widgets'][irow][1].get(),
+                    'field_name_short': short
                 }
+        
+        if n:
+            filename = filedialog.asksaveasfilename(
+                filetypes= [('data files', '.dat')], 
+                defaultextension='.dat',
+                initialdir= WindX['self_folder'],
+                title= "Save As",
+                initialfile = "MyWallet." + getpass.getuser() + ".dat"
+                )
 
-        filename = filedialog.asksaveasfilename(
-            filetypes= [('data files', '.dat')], 
-            defaultextension='.dat',
-            initialdir= WindX['self_folder'],
-            title= "Save As",
-            initialfile = "MyWallet." + getpass.getuser() + ".dat"
-            )
-
-        if filename:
-            fdata = CryptMe(json.dumps(data),key=GetMD5(WindX['EncryptCode']), isEncript=True)
-            Save2File(fdata, filename)
+            if filename:
+                fdata = CryptMe(json.dumps(data),key=GetMD5(WindX['EncryptCode']), isEncript=True)
+                Save2File(fdata, filename)
+        else:
+            print("No data to save in your wallet!")
+            messagebox.showwarning(title='Warning', message="No data to save in your wallet!")
 
     elif act == "get":
         if not InputCheck():
-            return
+            return        
 
         filename = filedialog.askopenfilename(
                     filetypes= [('data files', '.dat')], 
@@ -114,20 +124,30 @@ def PSWaction(row=0,act=None):
                 data  = json.loads(CryptMe(fdata,key=GetMD5(WindX['EncryptCode']), isEncript=False))
 
                 #print(data)
-                if data.__contains__('1'):
+                if data.__contains__('1'):     
+                    if WindX['Frame3_colnum'] > 1:               
+                        for i in range(2,WindX['Frame3_colnum']+1):
+                            WindX['form_widgets_short'][i].destroy()
+
                     for irow in WindX['form_widgets']:
-                        for i in range(2,len(WindX['form_widgets'][irow])):
+                        for i in range(3,len(WindX['form_widgets'][irow])):
                             #print(WindX['form_widgets'][row][i])
                             WindX['form_widgets'][irow][i].destroy()
 
                     WindX['form_widgets'] = {}
                     WindX['form_rows'] =1
+                    WindX['form_widgets_short'] = {}
+                    WindX['Frame3_colnum'] = 1                    
 
                     for i in data:
                         if not i == 'others':
+                            if not data[i].__contains__('field_name_short'):
+                                data[i]['field_name_short'] = ''
+
                             UIaddNewRow(WindX['Frame1'], 
                                         {'field_name' : data[i]['field_name' ],
-                                        'field_value': data[i]['field_value']
+                                        'field_value': data[i]['field_value'],
+                                        'field_name_short': data[i]['field_name_short']
                                         })
                 else:
                     print("No data in your wallet!")
@@ -138,12 +158,14 @@ def PSWaction(row=0,act=None):
     elif act == 'new':
         para = {
             'field_name': 'new field ' + str(WindX['form_rows'] + 1),
-            'field_value': ''
+            'field_value': '',
+            'field_name_short': ''
         }
 
         UIaddNewRow(WindX['Frame1'], para)
 
     WindX['e_status'].config(text="")
+    SeeMe(None,WindX['e_EncryptCode'],'*')
 
 def OpenFile(filepath):    
     print("\t.... Open file:",filepath)
@@ -305,10 +327,12 @@ def ShowHideBasic():
     if WindX['ShowHideBasic'] == 1:
         WindX['ShowHideBasic'] = 0
         WindX['Frame1'].grid_remove()
+        WindX['Frame2'].grid_remove()
         WindX['e_HideBase'].config(text="  ∨ ")
     else:
         WindX['ShowHideBasic'] = 1
         WindX['Frame1'].grid()
+        WindX['Frame2'].grid()
         WindX['e_HideBase'].config(text="  ∧ ")
 
 def Init(IsInit=1):          
@@ -324,6 +348,8 @@ def Init(IsInit=1):
     WindX['Frame1'].grid(row=1,column=0,sticky=E+W+S+N,pady=5,padx=5)
     WindX['Frame2'] = Frame(WindX['main'])
     WindX['Frame2'].grid(row=2,column=0,sticky=E+W+S+N,pady=0,padx=0)
+    WindX['Frame3'] = Frame(WindX['main'])
+    WindX['Frame3'].grid(row=3,column=0,sticky=E+W+S+N,pady=0,padx=0)
     
     hideshow_icon = '  ∧  '
 
@@ -334,12 +360,13 @@ def Init(IsInit=1):
         Label(WindX['Frame1'], text='Encrypt / Decrypt Code', justify=CENTER, relief=FLAT,pady=3,padx=3).grid(row=row,column=0,sticky=E+W,columnspan=2)
         WindXX['EncryptCode'] = StringVar()
         e=Entry(WindX['Frame1'], justify=LEFT, relief=FLAT, textvariable= WindXX['EncryptCode'], show="*")
-        e.grid(row=row,column=2,sticky=E+W,padx=3)
+        e.grid(row=row,column=2,sticky=E+W,padx=3,columnspan=3)
         e.insert(0,WindX['EncryptCode'])
         e.bind('<FocusIn>',func=handlerAdaptor(CapLockStatus,e=e))
         e.bind('<KeyRelease>',func=handlerAdaptor(CapLockStatus,e=e))
-        e.bind('<Leave>',func=handlerAdaptor(SeeMe,e=e,ishow='*'))   
-    
+        e.bind('<Leave>',func=handlerAdaptor(SeeMe,e=e,ishow='*'))
+        e.focus()
+        WindX['e_EncryptCode'] = e
 
     if WindX['Frame2']: 
         row = 0 
@@ -355,17 +382,25 @@ def Init(IsInit=1):
         #iButton(WindX['Frame2'],row,6,WindExit,'x','red',width=5)                                      
         #iSeparator(WindX['Frame2'],row,7) 
 
-        b = iButton(WindX['Frame2'],row,8,ShowHideBasic,hideshow_icon, width=10)
-        WindX['e_HideBase'] = b.b  
-        WindX['ShowHideBasic'] = 1 
-
         row +=1
-        e = Label(WindX['Frame2'], text='', justify=LEFT, fg='#009900', bg='#E0E0E0', relief=FLAT,pady=3,padx=3)
+        e = Label(WindX['Frame2'], text='Input [Code], then [Open] to load data ...', justify=LEFT, fg='#009900', bg='#E0E0E0', relief=FLAT,pady=3,padx=3)
         e.grid(row=row,column=0,sticky=E+W+N+S,pady=0,padx=0,columnspan=20)
         WindX['e_status'] = e
 
+    if WindX['Frame3']: 
+        row = 0
+        e = Label(WindX['Frame3'], text='30', justify=LEFT, fg='#009900', bg='#E0E0E0', relief=FLAT,pady=3,padx=3,width=4)
+        e.grid(row=row,column=0,sticky=E+W+N+S,pady=0,padx=0)
+        WindX['e_status_3'] = e
+
+        b = iButton(WindX['Frame3'],row,1,ShowHideBasic,hideshow_icon, width=4)
+        WindX['e_HideBase'] = b.b  
+        WindX['ShowHideBasic'] = 1
+
+        WindX['Frame3_colnum'] = 1
+
     HideConsole()
-    mainloop()  
+    mainloop()
 
 def UIaddNewRow(form, para):
     WindX['form_rows'] +=1
@@ -379,10 +414,18 @@ def UIaddNewRow(form, para):
     ef.insert(0,para['field_name'])
     ef.bind('<FocusIn>',func=handlerAdaptor(CapLockStatus,e=ef))
     ef.bind('<KeyRelease>',func=handlerAdaptor(CapLockStatus,e=ef))
+    ef.focus()
+
+    sv_fieldnameShort = StringVar()
+    efs=Entry(form, justify=LEFT, relief=FLAT, textvariable= sv_fieldnameShort,width=5)
+    efs.grid(row=WindX['form_rows'],column=2,sticky=E+W+N+S,padx=1,pady=1)
+    efs.insert(0,para['field_name_short'])
+    efs.bind('<FocusIn>',func=handlerAdaptor(CapLockStatus,e=ef))
+    efs.bind('<KeyRelease>',func=handlerAdaptor(CapLockStatus,e=ef))
 
     sv_value = StringVar()
     ev=Entry(form, justify=LEFT, relief=FLAT, textvariable= sv_value, show="*")
-    ev.grid(row=WindX['form_rows'],column=2,sticky=E+W+N+S,padx=1,pady=1)
+    ev.grid(row=WindX['form_rows'],column=3,sticky=E+W+N+S,padx=1,pady=1)
     ev.insert(0,para['field_value'])
     ev.bind('<FocusIn>',func=handlerAdaptor(CapLockStatus,e=ev))
     ev.bind('<KeyRelease>',func=handlerAdaptor(CapLockStatus,e=ev))
@@ -390,8 +433,12 @@ def UIaddNewRow(form, para):
 
     bsend = iButton(form,WindX['form_rows'],4,lambda:PSWaction(row,"send"),'Send',p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',6,E+W+N+S,1,1])
 
-    WindX['form_widgets'][WindX['form_rows']] = [sv_fieldname,sv_value, bdelete.b, ef, ev, bsend.b]
+    WindX['form_widgets'][WindX['form_rows']] = [sv_fieldname,sv_value, sv_fieldnameShort, bdelete.b, ef, ev, bsend.b, efs]
 
+    if para['field_name_short'] and WindX['Frame3']:
+        WindX['Frame3_colnum'] +=1
+        bs = iButton(WindX['Frame3'],0,WindX['Frame3_colnum'],lambda:PSWaction(row,"send"),para['field_name_short'],p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',4,E+W+N+S,1,1])
+        WindX['form_widgets_short'][WindX['Frame3_colnum']] = bs.b
 #---------------------------------
 #Structure for a keycode input
 class KeyBdInput(Structure):
@@ -567,7 +614,7 @@ def main():
     WindX['ShowHideBasic'] = 1
     WindX['form_rows'] = 0
     WindX['form_widgets'] = {}
-
+    WindX['form_widgets_short'] = {}
 
     Init()
 
