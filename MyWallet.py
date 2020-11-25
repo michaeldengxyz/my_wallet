@@ -11,7 +11,8 @@ import win32api
 import win32con
 
 from tkinter import *
-from tkinter import filedialog,messagebox
+from tkinter import filedialog,messagebox,tix as Tix
+
 
 import getpass
 import zlib
@@ -336,7 +337,7 @@ def ShowHideBasic():
         WindX['e_HideBase'].config(text="  ∧ ")
 
 def Init(IsInit=1):          
-    WindX['main'] = Tk()
+    WindX['main'] = Tix.Tk()
     WindX['main'].title("My Wallet")
 
     WindX['main'].geometry('+' + str(WindX['mainPX']) + '+' + str(WindX['mainPY']))
@@ -345,19 +346,23 @@ def Init(IsInit=1):
     WindX['main'].protocol("WM_DELETE_WINDOW", WindExit)
 
     WindX['Frame1'] = Frame(WindX['main'])
-    WindX['Frame1'].grid(row=1,column=0,sticky=E+W+S+N,pady=5,padx=5)
+    WindX['Frame1'].grid(row=1,column=0,sticky=E+W+S+N,pady=0,padx=0)
     WindX['Frame2'] = Frame(WindX['main'])
     WindX['Frame2'].grid(row=2,column=0,sticky=E+W+S+N,pady=0,padx=0)
     WindX['Frame3'] = Frame(WindX['main'])
     WindX['Frame3'].grid(row=3,column=0,sticky=E+W+S+N,pady=0,padx=0)
     
+    balstatus = Label(WindX['main'], justify=CENTER, relief=FLAT,pady=3,padx=3, bg='yellow',wraplength = 50)
+    #balstatus.grid(row=4,column=0,sticky=E+W+S+N,pady=0,padx=0)
+    WindX['winBalloon'] = Tix.Balloon(WindX['main'], statusbar = balstatus)
+
     hideshow_icon = '  ∧  '
 
     if WindX['Frame1']:
         WindX['form_rows'] +=1
 
         row = 0  
-        Label(WindX['Frame1'], text='Encrypt / Decrypt Code', justify=CENTER, relief=FLAT,pady=3,padx=3).grid(row=row,column=0,sticky=E+W,columnspan=2)
+        Label(WindX['Frame1'], text='Encrypt / Decrypt Code', justify=CENTER, relief=FLAT,pady=3,padx=3, bg='#E0E0E0').grid(row=row,column=0,sticky=E+W,columnspan=2)
         WindXX['EncryptCode'] = StringVar()
         e=Entry(WindX['Frame1'], justify=LEFT, relief=FLAT, textvariable= WindXX['EncryptCode'], show="*")
         e.grid(row=row,column=2,sticky=E+W,padx=3,columnspan=3)
@@ -376,9 +381,10 @@ def Init(IsInit=1):
         iButton(WindX['Frame2'],row,2,lambda:PSWaction(0,"save"),'Save', width=10)  
         iSeparator(WindX['Frame2'],row,3)    
 
-        iButton(WindX['Frame2'],row,4,lambda:PSWaction(0,"new"),'New', width=10)  
+        b = iButton(WindX['Frame2'],row,4,lambda:PSWaction(0,"new"),'New', width=10)  
         iSeparator(WindX['Frame2'],row,5)
-        
+        WindX['winBalloon'].bind_widget(b.b, balloonmsg= 'Add new row')
+
         #iButton(WindX['Frame2'],row,6,WindExit,'x','red',width=5)                                      
         #iSeparator(WindX['Frame2'],row,7) 
 
@@ -415,6 +421,7 @@ def UIaddNewRow(form, para):
     ef.bind('<FocusIn>',func=handlerAdaptor(CapLockStatus,e=ef))
     ef.bind('<KeyRelease>',func=handlerAdaptor(CapLockStatus,e=ef))
     ef.focus()
+    WindX['winBalloon'].bind_widget(ef, balloonmsg= 'Field Name')
 
     sv_fieldnameShort = StringVar()
     efs=Entry(form, justify=LEFT, relief=FLAT, textvariable= sv_fieldnameShort,width=5)
@@ -422,6 +429,7 @@ def UIaddNewRow(form, para):
     efs.insert(0,para['field_name_short'])
     efs.bind('<FocusIn>',func=handlerAdaptor(CapLockStatus,e=ef))
     efs.bind('<KeyRelease>',func=handlerAdaptor(CapLockStatus,e=ef))
+    WindX['winBalloon'].bind_widget(efs, balloonmsg= 'Short Field Name')
 
     sv_value = StringVar()
     ev=Entry(form, justify=LEFT, relief=FLAT, textvariable= sv_value, show="*")
@@ -429,7 +437,8 @@ def UIaddNewRow(form, para):
     ev.insert(0,para['field_value'])
     ev.bind('<FocusIn>',func=handlerAdaptor(CapLockStatus,e=ev))
     ev.bind('<KeyRelease>',func=handlerAdaptor(CapLockStatus,e=ev))
-    ev.bind('<Leave>',func=handlerAdaptor(SeeMe,e=ev,ishow='*'))   
+    ev.bind('<Leave>',func=handlerAdaptor(SeeMe,e=ev,ishow='*'))  
+    WindX['winBalloon'].bind_widget(ev, balloonmsg= 'Field Value to be sent')
 
     bsend = iButton(form,WindX['form_rows'],4,lambda:PSWaction(row,"send"),'Send',p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',6,E+W+N+S,1,1])
 
@@ -439,6 +448,8 @@ def UIaddNewRow(form, para):
         WindX['Frame3_colnum'] +=1
         bs = iButton(WindX['Frame3'],0,WindX['Frame3_colnum'],lambda:PSWaction(row,"send"),para['field_name_short'],p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',4,E+W+N+S,1,1])
         WindX['form_widgets_short'][WindX['Frame3_colnum']] = bs.b
+        WindX['winBalloon'].bind_widget(bs.b, balloonmsg= para['field_name'])
+
 #---------------------------------
 #Structure for a keycode input
 class KeyBdInput(Structure):
