@@ -1,2 +1,2 @@
 # my_wallet
-a wallet to save my ID or passwords with one encrypt or decrypt code
+a wallet to save my keys such as ID or passwords, with one encrypt or decrypt code
