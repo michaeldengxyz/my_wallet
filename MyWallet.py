@@ -9,6 +9,8 @@ import os,sys
 import win32gui
 import win32api
 import win32con
+import win32com.client
+import win32process
 
 from tkinter import *
 from tkinter import filedialog,messagebox,tix as Tix
@@ -22,6 +24,7 @@ from Crypto.Cipher import AES
 import json
 from ctypes import *
 import random, string
+import threading
 
 WindX  = {}
 WindXX = {}
@@ -31,6 +34,26 @@ sys.path.append(WindX['self_folder'])
 os.chdir(WindX['self_folder'])
 WindX['pcName'] = os.environ['COMPUTERNAME']
 print("getcwd:",os.getcwd() + "\nDevice Name:",WindX['pcName'])
+
+def WinFocusOn():
+    
+    
+    if len(WindX['FGW'][1]):
+        try:           
+            l, t, r, b = win32gui.GetWindowRect(WindX['FGW'][1][0])
+            print(".... SetForegroundWindow:",WindX['FGW'][1], l, t, r, b)                    
+            win32gui.SetForegroundWindow(WindX['FGW'][1][0])
+
+            x = l + 5
+            y = t + 5
+            #win32api.mouse_event(win32con.MOUSEEVENTF_MOVE | win32con.MOUSEEVENTF_ABSOLUTE, int(x/SCREEN_WIDTH*65535.0), int(y/SCREEN_HEIGHT*65535.0))
+            win32api.SetCursorPos((x,y))
+            win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN,x,y,0,0)
+            win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP,x,y,0,0)
+        except:
+            print(traceback.format_exc())
+    else:
+        print(".... Can not catch ForegroundWindow!")
 
 def HideConsole():
     try:
@@ -50,26 +73,45 @@ def HideConsole():
 def PSWaction(row=0,act=None):
     #print("psw action",row,act)
 
+    if WindX['e_warnLabel']:
+        try:
+            WindX['e_warnLabel'].destroy()
+        except:
+            pass
+        WindX['e_warnLabel'] = None
+        
     if act == "send":
         #WindX['form_widgets'][row] = [sv_fieldname, sv_value, bdelete.b, ef, ev, bsend.b]
-        #                              0             1         2          3   4   5    
+        #   
+        #                            0             1         2          3   4   5    
+        #pos = win32api.GetCursorPos()
+        WindX['win_not_sending_key'] = 0
         t = 30
         while t:
-            WindX['e_status'].config(text="Send ["+ WindX['form_widgets'][row][0].get() +"] in " + str(t) + " seconds ...")
-            WindX['e_status_3'].config(text=str(t))
+            WindX['main'].title("{:>02d}".format(t) + " Sending: "+ WindX['form_widgets'][row][0].get())
             WindX['main'].update()
             time.sleep(0.1)
             t = t - 1
-        WindX['e_status'].config(text="Sending ["+ WindX['form_widgets'][row][0].get() +"] now ...")
-        WindX['e_status_3'].config(text=str(t))
+
+        WindX['main'].title("Sending ["+ WindX['form_widgets'][row][0].get() +"] now ...")
+        
+        #print("Mouse click position:",str(pos[0]), str(pos[1]))
+        #win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
+        #win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
+        WinFocusOn()
         SendString(WindX['form_widgets'][row][1].get())
+        WindX['win_not_sending_key'] = 1
 
     elif act == "delete":
         #delete the row
-        for i in range(3,len(WindX['form_widgets'][row])):
+        for i in range(4,len(WindX['form_widgets'][row])):
             #print(WindX['form_widgets'][row][i])
             WindX['form_widgets'][row][i].grid_remove()
+
         del WindX['form_widgets'][row]
+
+        if WindX['form_widgets_short'].__contains__(row):
+            WindX['form_widgets_short'][row].destroy()
         #print(WindX['form_widgets'])
 
     elif act == "save":
@@ -87,10 +129,12 @@ def PSWaction(row=0,act=None):
                 short = WindX['form_widgets'][irow][2].get()
                 if not short:
                     short = WindX['form_widgets'][irow][0].get()
+                
                 data[n] = {
                     'field_name' : WindX['form_widgets'][irow][0].get(),
                     'field_value': WindX['form_widgets'][irow][1].get(),
-                    'field_name_short': short
+                    'field_name_short': short,
+                    'ischeck' : WindX['form_widgets'][irow][3].get()
                 }
         
         if n:
@@ -121,6 +165,8 @@ def PSWaction(row=0,act=None):
                     )
         if filename:
             try:
+                WindX['win_pos'] = {'orig_width':0, 'geo_xy':'', 'toolbar_height':0}
+                
                 fdata = OpenFile(filename)
                 data  = json.loads(CryptMe(fdata,key=GetMD5(WindX['EncryptCode']), isEncript=False))
 
@@ -128,10 +174,11 @@ def PSWaction(row=0,act=None):
                 if data.__contains__('1'):     
                     if WindX['Frame3_colnum'] > 1:               
                         for i in range(2,WindX['Frame3_colnum']+1):
-                            WindX['form_widgets_short'][i].destroy()
+                            if WindX['form_widgets_short'].__contains__(i):
+                                WindX['form_widgets_short'][i].destroy()
 
                     for irow in WindX['form_widgets']:
-                        for i in range(3,len(WindX['form_widgets'][irow])):
+                        for i in range(4,len(WindX['form_widgets'][irow])):
                             #print(WindX['form_widgets'][row][i])
                             WindX['form_widgets'][irow][i].destroy()
 
@@ -144,11 +191,14 @@ def PSWaction(row=0,act=None):
                         if not i == 'others':
                             if not data[i].__contains__('field_name_short'):
                                 data[i]['field_name_short'] = ''
+                            if not data[i].__contains__('ischeck'):
+                                data[i]['ischeck'] = 0
 
                             UIaddNewRow(WindX['Frame1'], 
                                         {'field_name' : data[i]['field_name' ],
                                         'field_value': data[i]['field_value'],
-                                        'field_name_short': data[i]['field_name_short']
+                                        'field_name_short': data[i]['field_name_short'],
+                                        'ischeck': data[i]['ischeck']
                                         })
                 else:
                     print("No data in your wallet!")
@@ -160,12 +210,13 @@ def PSWaction(row=0,act=None):
         para = {
             'field_name': 'new field ' + str(WindX['form_rows'] + 1),
             'field_value': '',
-            'field_name_short': ''
+            'field_name_short': '',
+            'ischeck': 0
         }
 
         UIaddNewRow(WindX['Frame1'], para)
 
-    WindX['e_status'].config(text="")
+    WindX['main'].title("My Wallet")
     SeeMe(None,WindX['e_EncryptCode'],'*')
 
 def OpenFile(filepath):    
@@ -325,12 +376,25 @@ def InputCheck():
     return yes   
 
 def ShowHideBasic():
+    if not WindX['win_pos']['orig_width']:
+        WindX['win_pos']['orig_width'] = WindX['main'].winfo_width()        
+
     if WindX['ShowHideBasic'] == 1:
         WindX['ShowHideBasic'] = 0
         WindX['Frame1'].grid_remove()
         WindX['Frame2'].grid_remove()
         WindX['e_HideBase'].config(text="  ∨ ")
+        geos = re.split(r'\D',WindX['main'].geometry(),re.I)
+        WindX['win_pos']['geo_xy'] = geos[2]
+
+        if not WindX['win_pos']['toolbar_height']:
+            WindX['main'].update()
+            WindX['win_pos']['toolbar_height'] = WindX['main'].winfo_height()
+
+        WindX['main'].geometry(str(WindX['win_pos']['orig_width']) + 'x' + str(WindX['win_pos']['toolbar_height']) + '+' + WindX['win_pos']['geo_xy'])
+
     else:
+        WindX['main'].geometry("")
         WindX['ShowHideBasic'] = 1
         WindX['Frame1'].grid()
         WindX['Frame2'].grid()
@@ -339,18 +403,19 @@ def ShowHideBasic():
 def Init(IsInit=1):          
     WindX['main'] = Tix.Tk()
     WindX['main'].title("My Wallet")
-
+    WindX['main'].configure(bg='#A0A0A0')
     WindX['main'].geometry('+' + str(WindX['mainPX']) + '+' + str(WindX['mainPY']))
     WindX['main'].wm_attributes('-topmost',1) 
     #WindX['main'].overrideredirect(1)
     WindX['main'].protocol("WM_DELETE_WINDOW", WindExit)
 
-    WindX['Frame1'] = Frame(WindX['main'])
-    WindX['Frame1'].grid(row=1,column=0,sticky=E+W+S+N,pady=0,padx=0)
-    WindX['Frame2'] = Frame(WindX['main'])
+    WindX['Frame3'] = Frame(WindX['main'],bg='#E0E0E0')
+    WindX['Frame3'].grid(row=0,column=0,sticky=E+W+S+N,pady=0,padx=0)
+
+    WindX['Frame1'] = Frame(WindX['main'],bg='#E0E0E0')
+    WindX['Frame1'].grid(row=1,column=0,sticky=E+W+S+N,pady=1,padx=0)
+    WindX['Frame2'] = Frame(WindX['main'],bg='#E0E0E0')
     WindX['Frame2'].grid(row=2,column=0,sticky=E+W+S+N,pady=0,padx=0)
-    WindX['Frame3'] = Frame(WindX['main'])
-    WindX['Frame3'].grid(row=3,column=0,sticky=E+W+S+N,pady=0,padx=0)
     
     balstatus = Label(WindX['main'], justify=CENTER, relief=FLAT,pady=3,padx=3, bg='yellow',wraplength = 50)
     #balstatus.grid(row=4,column=0,sticky=E+W+S+N,pady=0,padx=0)
@@ -365,7 +430,7 @@ def Init(IsInit=1):
         Label(WindX['Frame1'], text='Encrypt / Decrypt Code', justify=CENTER, relief=FLAT,pady=3,padx=3, bg='#E0E0E0').grid(row=row,column=0,sticky=E+W,columnspan=2)
         WindXX['EncryptCode'] = StringVar()
         e=Entry(WindX['Frame1'], justify=LEFT, relief=FLAT, textvariable= WindXX['EncryptCode'], show="*")
-        e.grid(row=row,column=2,sticky=E+W,padx=3,columnspan=3)
+        e.grid(row=row,column=2,sticky=E+W,columnspan=4,pady=0,padx=1)
         e.insert(0,WindX['EncryptCode'])
         e.bind('<FocusIn>',func=handlerAdaptor(CapLockStatus,e=e))
         e.bind('<KeyRelease>',func=handlerAdaptor(CapLockStatus,e=e))
@@ -385,66 +450,81 @@ def Init(IsInit=1):
         iSeparator(WindX['Frame2'],row,5)
         WindX['winBalloon'].bind_widget(b.b, balloonmsg= 'Add new row')
 
-        #iButton(WindX['Frame2'],row,6,WindExit,'x','red',width=5)                                      
-        #iSeparator(WindX['Frame2'],row,7) 
-
-        row +=1
-        e = Label(WindX['Frame2'], text='Input [Code], then [Open] to load data ...', justify=LEFT, fg='#009900', bg='#E0E0E0', relief=FLAT,pady=3,padx=3)
-        e.grid(row=row,column=0,sticky=E+W+N+S,pady=0,padx=0,columnspan=20)
-        WindX['e_status'] = e
-
     if WindX['Frame3']: 
-        row = 0
-        e = Label(WindX['Frame3'], text='30', justify=LEFT, fg='#009900', bg='#E0E0E0', relief=FLAT,pady=3,padx=3,width=4)
-        e.grid(row=row,column=0,sticky=E+W+N+S,pady=0,padx=0)
-        WindX['e_status_3'] = e
-
-        b = iButton(WindX['Frame3'],row,1,ShowHideBasic,hideshow_icon, width=4)
+        b = iButton(WindX['Frame3'],0,1,ShowHideBasic,hideshow_icon, width=4)
         WindX['e_HideBase'] = b.b  
         WindX['ShowHideBasic'] = 1
 
         WindX['Frame3_colnum'] = 1
 
+        xlbl = Label(WindX['Frame3'], text='Input [Code], then [Open] to load data ...', justify=CENTER, relief=FLAT,pady=3,padx=3, bg='yellow')
+        xlbl.grid(row=0,column=2,sticky=E+W,columnspan=2)
+        WindX['e_warnLabel'] = xlbl
+
     HideConsole()
     mainloop()
+
+def ColumnPadx(col):
+    if col % 2:
+        return 1
+    else:
+        return 0
 
 def UIaddNewRow(form, para):
     WindX['form_rows'] +=1
     row = WindX['form_rows']
+    col = 0
+    pady_row = 0
+    if WindX['form_rows'] % 2:
+        pady_row = 1
+    
+    sv_ischeck = IntVar()
+    ef_chkb = Checkbutton(form, text= WindX['form_rows'] - 1, variable= sv_ischeck, justify=LEFT, fg='#009900', bg='#E0E0E0', relief=FLAT)
+    ef_chkb.grid(row=WindX['form_rows'],column=col,sticky=E+W+N+S,padx=ColumnPadx(col),pady=pady_row)
+    if para['ischeck']:
+        ef_chkb.select()
+    WindX['winBalloon'].bind_widget(ef_chkb, balloonmsg= 'Checked to show on the toolbar')
 
-    bdelete = iButton(form,WindX['form_rows'],0,lambda:PSWaction(row,"delete"),'x',fg='red',p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',3,E+W+N+S,1,1])
-
+    col +=1
     sv_fieldname = StringVar()
-    ef=Entry(form, justify=LEFT, relief=FLAT, textvariable= sv_fieldname)
-    ef.grid(row=WindX['form_rows'],column=1,sticky=E+W+N+S,padx=1,pady=1)
+    ef=Entry(form, justify=LEFT, relief=FLAT, textvariable= sv_fieldname, width=30)
+    ef.grid(row=WindX['form_rows'],column=col,sticky=E+W+N+S,padx=ColumnPadx(col),pady=pady_row)
     ef.insert(0,para['field_name'])
     ef.bind('<FocusIn>',func=handlerAdaptor(CapLockStatus,e=ef))
     ef.bind('<KeyRelease>',func=handlerAdaptor(CapLockStatus,e=ef))
     ef.focus()
     WindX['winBalloon'].bind_widget(ef, balloonmsg= 'Field Name')
 
+    col +=1
     sv_fieldnameShort = StringVar()
-    efs=Entry(form, justify=LEFT, relief=FLAT, textvariable= sv_fieldnameShort,width=5)
-    efs.grid(row=WindX['form_rows'],column=2,sticky=E+W+N+S,padx=1,pady=1)
+    efs=Entry(form, justify=LEFT, relief=FLAT, textvariable= sv_fieldnameShort,width=6)
+    efs.grid(row=WindX['form_rows'],column=col,sticky=E+W+N+S,padx=ColumnPadx(col),pady=pady_row)
     efs.insert(0,para['field_name_short'])
     efs.bind('<FocusIn>',func=handlerAdaptor(CapLockStatus,e=ef))
     efs.bind('<KeyRelease>',func=handlerAdaptor(CapLockStatus,e=ef))
     WindX['winBalloon'].bind_widget(efs, balloonmsg= 'Short Field Name')
-
+    
+    col +=1
     sv_value = StringVar()
-    ev=Entry(form, justify=LEFT, relief=FLAT, textvariable= sv_value, show="*")
-    ev.grid(row=WindX['form_rows'],column=3,sticky=E+W+N+S,padx=1,pady=1)
+    ev=Entry(form, justify=LEFT, relief=FLAT, textvariable= sv_value, show="*", width=30)
+    ev.grid(row=WindX['form_rows'],column=col,sticky=E+W+N+S,padx=ColumnPadx(col),pady=pady_row)
     ev.insert(0,para['field_value'])
     ev.bind('<FocusIn>',func=handlerAdaptor(CapLockStatus,e=ev))
     ev.bind('<KeyRelease>',func=handlerAdaptor(CapLockStatus,e=ev))
     ev.bind('<Leave>',func=handlerAdaptor(SeeMe,e=ev,ishow='*'))  
     WindX['winBalloon'].bind_widget(ev, balloonmsg= 'Field Value to be sent')
 
-    bsend = iButton(form,WindX['form_rows'],4,lambda:PSWaction(row,"send"),'Send',p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',6,E+W+N+S,1,1])
+    col +=1
+    bsend = iButton(form,WindX['form_rows'],col,lambda:PSWaction(row,"send"),'Send',p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',6,E+W+N+S,pady_row,ColumnPadx(col)])
+    WindX['winBalloon'].bind_widget(bsend.b, balloonmsg= 'Send field value')
 
-    WindX['form_widgets'][WindX['form_rows']] = [sv_fieldname,sv_value, sv_fieldnameShort, bdelete.b, ef, ev, bsend.b, efs]
+    col +=1
+    bdelete = iButton(form,WindX['form_rows'],col,lambda:PSWaction(row,"delete"),'x',fg='red',p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',3,E+W+N+S,pady_row,ColumnPadx(col)])
+    WindX['winBalloon'].bind_widget(bdelete.b, balloonmsg= 'Delete this row')
 
-    if para['field_name_short'] and WindX['Frame3']:
+    WindX['form_widgets'][WindX['form_rows']] = [sv_fieldname,sv_value, sv_fieldnameShort, sv_ischeck, bdelete.b, ef, ev, bsend.b, efs, ef_chkb]
+
+    if para['field_name_short'] and WindX['Frame3'] and para['ischeck']:
         WindX['Frame3_colnum'] +=1
         bs = iButton(WindX['Frame3'],0,WindX['Frame3_colnum'],lambda:PSWaction(row,"send"),para['field_name_short'],p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',4,E+W+N+S,1,1])
         WindX['form_widgets_short'][WindX['Frame3_colnum']] = bs.b
@@ -626,9 +706,41 @@ def main():
     WindX['form_rows'] = 0
     WindX['form_widgets'] = {}
     WindX['form_widgets_short'] = {}
+    WindX['e_warnLabel'] = None
+    WindX['win_pos'] = {'orig_width':0, 'geo_xy':'', 'toolbar_height':0}    
 
     Init()
 
+def ForeGroundWindowsCheck():
+    WindX['FGW'] = {1:[],2:[]}
 
-if __name__ == "__main__":      
-    main()    
+    while True:
+        try:
+            fgwHandle = win32gui.GetForegroundWindow()
+            if fgwHandle and WindX['win_not_sending_key']:    
+                if len(WindX['FGW'][1]) == 0:
+                    WindX['FGW'][1] = [fgwHandle, win32gui.GetWindowText(fgwHandle)]
+                    #print("FGW", WindX['FGW'])
+
+                elif len(WindX['FGW'][2]) == 0:
+                    WindX['FGW'][2] = [fgwHandle, win32gui.GetWindowText(fgwHandle)]
+                    #print("FGW", WindX['FGW'])
+
+                elif not (fgwHandle == WindX['FGW'][2][0]):
+                    WindX['FGW'][1] = WindX['FGW'][2]
+                    WindX['FGW'][2] = [fgwHandle, win32gui.GetWindowText(fgwHandle)]
+                    #print("FGW", WindX['FGW'])
+        except:
+            print(traceback.format_exc()) 
+
+        time.sleep(0.1)
+
+if __name__ == "__main__": 
+    WindX['win_not_sending_key'] = 1
+
+    delaySeconds = 1
+    t1 = threading.Timer(delaySeconds,ForeGroundWindowsCheck)
+    t2 = threading.Timer(delaySeconds,main)
+    t1.start()  
+    t2.start()
+        
