@@ -35,9 +35,7 @@ os.chdir(WindX['self_folder'])
 WindX['pcName'] = os.environ['COMPUTERNAME']
 print("getcwd:",os.getcwd() + "\nDevice Name:",WindX['pcName'])
 
-def WinFocusOn():
-    
-    
+def WinFocusOn():    
     if len(WindX['FGW'][1]):
         try:           
             l, t, r, b = win32gui.GetWindowRect(WindX['FGW'][1][0])
@@ -49,7 +47,7 @@ def WinFocusOn():
             #win32api.mouse_event(win32con.MOUSEEVENTF_MOVE | win32con.MOUSEEVENTF_ABSOLUTE, int(x/SCREEN_WIDTH*65535.0), int(y/SCREEN_HEIGHT*65535.0))
             win32api.SetCursorPos((x,y))
             win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN,x,y,0,0)
-            win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP,x,y,0,0)
+            win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP,x,y,0,0)            
         except:
             print(traceback.format_exc())
     else:
@@ -84,14 +82,18 @@ def PSWaction(row=0,act=None):
         #WindX['form_widgets'][row] = [sv_fieldname, sv_value, bdelete.b, ef, ev, bsend.b]
         #   
         #                            0             1         2          3   4   5    
-        #pos = win32api.GetCursorPos()
+        pos = win32api.GetCursorPos()
         WindX['win_not_sending_key'] = 0
-        t = 30
-        while t:
-            WindX['main'].title("{:>02d}".format(t) + " Sending: "+ WindX['form_widgets'][row][0].get())
-            WindX['main'].update()
-            time.sleep(0.1)
-            t = t - 1
+        t = re.sub(r'[^0-9]+','', WindXX['delay2send'].get())
+        WindX['e_delay2send'].delete(0,"end")
+        WindX['e_delay2send'].insert(0,t)
+        if t:
+            t = int(t)*10
+            while t:
+                WindX['main'].title("{:>02d}".format(t) + " Sending: "+ WindX['form_widgets'][row][0].get())
+                WindX['main'].update()
+                time.sleep(0.1)
+                t = t - 1
 
         WindX['main'].title("Sending ["+ WindX['form_widgets'][row][0].get() +"] now ...")
         
@@ -101,7 +103,8 @@ def PSWaction(row=0,act=None):
         WinFocusOn()
         SendString(WindX['form_widgets'][row][1].get())
         WindX['win_not_sending_key'] = 1
-
+        
+        win32api.SetCursorPos(pos)
     elif act == "delete":
         #delete the row
         for i in range(4,len(WindX['form_widgets'][row])):
@@ -430,13 +433,20 @@ def Init(IsInit=1):
         Label(WindX['Frame1'], text='Encrypt / Decrypt Code', justify=CENTER, relief=FLAT,pady=3,padx=3, bg='#E0E0E0').grid(row=row,column=0,sticky=E+W,columnspan=2)
         WindXX['EncryptCode'] = StringVar()
         e=Entry(WindX['Frame1'], justify=LEFT, relief=FLAT, textvariable= WindXX['EncryptCode'], show="*")
-        e.grid(row=row,column=2,sticky=E+W,columnspan=4,pady=0,padx=1)
+        e.grid(row=row,column=2,sticky=E+W,columnspan=2,pady=0,padx=1)
         e.insert(0,WindX['EncryptCode'])
         e.bind('<FocusIn>',func=handlerAdaptor(CapLockStatus,e=e))
         e.bind('<KeyRelease>',func=handlerAdaptor(CapLockStatus,e=e))
         e.bind('<Leave>',func=handlerAdaptor(SeeMe,e=e,ishow='*'))
         e.focus()
         WindX['e_EncryptCode'] = e
+
+        WindXX['delay2send'] = StringVar()
+        e2=Entry(WindX['Frame1'], justify=CENTER, relief=FLAT, textvariable= WindXX['delay2send'])
+        e2.grid(row=row,column=4,sticky=E+W,columnspan=2,pady=0,padx=1)
+        e2.insert(0,0)
+        WindX['e_delay2send'] = e2
+        WindX['winBalloon'].bind_widget(e2, balloonmsg= 'Delay to send, seconds after click')
 
     if WindX['Frame2']: 
         row = 0 
