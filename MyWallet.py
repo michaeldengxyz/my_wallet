@@ -14,7 +14,8 @@ import win32process
 
 from tkinter import *
 from tkinter import filedialog,messagebox,tix as Tix
-
+from pynput import mouse
+from pynput.mouse import Listener
 
 import getpass
 import zlib
@@ -35,6 +36,20 @@ os.chdir(WindX['self_folder'])
 WindX['pcName'] = os.environ['COMPUTERNAME']
 print("getcwd:",os.getcwd() + "\nDevice Name:",WindX['pcName'])
 
+WindX['LoginID']  = 'dengm'       
+WindX['LoginPSW'] = ''
+WindX['LoginSCD'] = '' 
+WindX['EncryptCode'] = ''
+WindX['mainPX'] = 20
+WindX['mainPY'] = 20 
+WindX['ShowHideBasic'] = 1
+WindX['form_rows'] = 0
+WindX['form_widgets'] = {}
+WindX['form_widgets_short'] = {}
+WindX['e_warnLabel'] = None
+WindX['win_pos'] = {'orig_width':0, 'geo_xy':'', 'toolbar_height':0}  
+WindX['mouse_click_points'] = []
+
 def WinFocusOn():    
     if len(WindX['FGW'][1]):
         try:           
@@ -42,8 +57,8 @@ def WinFocusOn():
             print(".... SetForegroundWindow:",WindX['FGW'][1], l, t, r, b)                    
             win32gui.SetForegroundWindow(WindX['FGW'][1][0])
 
-            x = l + 5
-            y = t + 5
+            x = l + 2
+            y = t + 2
             #win32api.mouse_event(win32con.MOUSEEVENTF_MOVE | win32con.MOUSEEVENTF_ABSOLUTE, int(x/SCREEN_WIDTH*65535.0), int(y/SCREEN_HEIGHT*65535.0))
             win32api.SetCursorPos((x,y))
             win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN,x,y,0,0)
@@ -86,25 +101,43 @@ def PSWaction(row=0,act=None):
         WindX['win_not_sending_key'] = 0
         t = re.sub(r'[^0-9]+','', WindXX['delay2send'].get())
         WindX['e_delay2send'].delete(0,"end")
-        WindX['e_delay2send'].insert(0,t)
+        if not t:
+            t = 0
+        else:
+            t = int(t)*1
+        WindX['e_delay2send'].insert(0,str(t))
+
         if t:
-            t = int(t)*10
-            while t:
-                WindX['main'].title("{:>02d}".format(t) + " Sending: "+ WindX['form_widgets'][row][0].get())
+            tt = int(t)*10
+            while tt:
+                WindX['main'].title("{:>02d}".format(tt) + " Sending: "+ WindX['form_widgets'][row][0].get())
                 WindX['main'].update()
                 time.sleep(0.1)
-                t = t - 1
+                tt = tt - 1
 
-        WindX['main'].title("Sending ["+ WindX['form_widgets'][row][0].get() +"] now ...")
+            WindX['main'].title("Sending ["+ WindX['form_widgets'][row][0].get() +"] now ...")
         
         #print("Mouse click position:",str(pos[0]), str(pos[1]))
         #win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
         #win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
-        WinFocusOn()
+        else:
+            n = len(WindX['mouse_click_points'])
+            if n >= 2:
+                print(WindX['mouse_click_points'])
+                print("Click on this point (x,y):",WindX['mouse_click_points'][n - 2][0], WindX['mouse_click_points'][n - 2][1])
+                imouse = mouse.Controller()
+                imouse.position = (WindX['mouse_click_points'][n - 2][0], WindX['mouse_click_points'][n - 2][1])
+                imouse.click(mouse.Button.left, 1)
+            else:
+                WinFocusOn()
+
         SendString(WindX['form_widgets'][row][1].get())
         WindX['win_not_sending_key'] = 1
-        
-        win32api.SetCursorPos(pos)
+        WindX['mouse_click_points'] = []
+
+        if not t:
+            win32api.SetCursorPos(pos)
+
     elif act == "delete":
         #delete the row
         for i in range(4,len(WindX['form_widgets'][row])):
@@ -591,7 +624,7 @@ def send_key_event(keyCode,isKeyup):
     if isKeyup == True:
         inputs[0].ui.ki.dwFlags = KEYEVENTF_KEYUP
     windll.user32.SendInput(1, pointer(inputs), sizeof(inputs[0]))
-    win32api.Sleep(3)
+    win32api.Sleep(1)
 
 def KeyDown(keyCode):
     send_key_event(keyCode,False)
@@ -706,19 +739,6 @@ class iButton:
         self.b.config(bg = self.bg)
 
 def main():
-    WindX['LoginID']  = 'dengm'       
-    WindX['LoginPSW'] = ''
-    WindX['LoginSCD'] = '' 
-    WindX['EncryptCode'] = ''
-    WindX['mainPX'] = 20
-    WindX['mainPY'] = 20 
-    WindX['ShowHideBasic'] = 1
-    WindX['form_rows'] = 0
-    WindX['form_widgets'] = {}
-    WindX['form_widgets_short'] = {}
-    WindX['e_warnLabel'] = None
-    WindX['win_pos'] = {'orig_width':0, 'geo_xy':'', 'toolbar_height':0}    
-
     Init()
 
 def ForeGroundWindowsCheck():
@@ -745,12 +765,23 @@ def ForeGroundWindowsCheck():
 
         time.sleep(0.1)
 
+def MouseOnClick(x, y, button, pressed):
+    #print(button,'{0} at {1}'.format('Pressed' if pressed else 'Released', (x, y)))
+    if re.match(r'.*left',str(button),re.I) and (not pressed):
+        WindX['mouse_click_points'].append([x,y])
+
+def MouseListener():
+    with Listener(on_click=MouseOnClick) as listener: #(on_move=on_move, on_click=on_click, on_scroll=on_scroll) 
+        listener.join()
+
 if __name__ == "__main__": 
     WindX['win_not_sending_key'] = 1
 
     delaySeconds = 1
     t1 = threading.Timer(delaySeconds,ForeGroundWindowsCheck)
     t2 = threading.Timer(delaySeconds,main)
+    t3 = threading.Timer(delaySeconds,MouseListener)
     t1.start()  
     t2.start()
+    t3.start()
         
