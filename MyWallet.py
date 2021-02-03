@@ -122,11 +122,14 @@ def PSWaction(row=0,act=None):
         #win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
         else:
             n = len(WindX['mouse_click_points'])
-            if n >= 2:
-                print(WindX['mouse_click_points'])
-                print("Click on this point (x,y):",WindX['mouse_click_points'][n - 2][0], WindX['mouse_click_points'][n - 2][1])
+            x = WindX['mouse_click_points'][n - 2][0]
+            y = WindX['mouse_click_points'][n - 2][1]
+            left, top, right, bottom = win32gui.GetWindowRect(WindX['FGW'][1][0])
+            if n >= 2 and (x >= left and x <= right and y >= top and y <= bottom):
+                #print(WindX['mouse_click_points'])
+                print("Click on this point (",x, y,")", WindX['FGW'][1])
                 imouse = mouse.Controller()
-                imouse.position = (WindX['mouse_click_points'][n - 2][0], WindX['mouse_click_points'][n - 2][1])
+                imouse.position = (x, y)
                 imouse.click(mouse.Button.left, 1)
             else:
                 WinFocusOn()
