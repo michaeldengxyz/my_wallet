@@ -4,7 +4,7 @@
 import time 
 import traceback
 import re
-import os,sys
+import os,sys,signal
 
 import win32gui
 import win32api
@@ -16,6 +16,7 @@ from tkinter import *
 from tkinter import filedialog,messagebox,tix as Tix
 from pynput import mouse
 from pynput.mouse import Listener
+from pynput import keyboard as keyboardX
 
 import getpass
 import zlib
@@ -26,6 +27,8 @@ import json
 from ctypes import *
 import random, string
 import threading
+import subprocess
+import psutil
 
 WindX  = {}
 WindXX = {}
@@ -36,12 +39,13 @@ os.chdir(WindX['self_folder'])
 WindX['pcName'] = os.environ['COMPUTERNAME']
 print("getcwd:",os.getcwd() + "\nDevice Name:",WindX['pcName'])
 
+WindX['main'] = None
 WindX['LoginID']  = 'dengm'       
 WindX['LoginPSW'] = ''
 WindX['LoginSCD'] = '' 
 WindX['EncryptCode'] = ''
-WindX['mainPX'] = 20
-WindX['mainPY'] = 20 
+WindX['mainPX'] = 0
+WindX['mainPY'] = 0 
 WindX['ShowHideBasic'] = 1
 WindX['form_rows'] = 0
 WindX['form_widgets'] = {}
@@ -83,6 +87,20 @@ def HideConsole():
     except:
         print(traceback.format_exc())
 
+def EnableEntry(wid=None, state="normal", act=1):
+    if not wid:
+        return
+    try:
+        for item in wid.winfo_children():
+            #print("-"*act,item)
+            if re.match(r'.*\!entry\d*$',str(item),re.I):
+                item.configure(state=state)
+
+            if item.winfo_children() :
+                EnableEntry(item, state=state, act=act+1)
+    except:
+        pass
+
 def PSWaction(row=0,act=None):
     #print("psw action",row,act)
 
@@ -97,6 +115,10 @@ def PSWaction(row=0,act=None):
         #WindX['form_widgets'][row] = [sv_fieldname, sv_value, bdelete.b, ef, ev, bsend.b]
         #   
         #                            0             1         2          3   4   5    
+        if WindX['form_widgets'][row][1].get() == 'LoginCiscoVPN':
+            LoginCiscoVPN()
+            return
+
         pos = win32api.GetCursorPos()
         WindX['win_not_sending_key'] = 0
         t = re.sub(r'[^0-9]+','', WindXX['delay2send'].get())
@@ -106,40 +128,44 @@ def PSWaction(row=0,act=None):
         else:
             t = int(t)*1
         WindX['e_delay2send'].insert(0,str(t))
-
-        if t:
-            tt = int(t)*10
-            while tt:
-                WindX['main'].title("{:>02d}".format(tt) + " Sending: "+ WindX['form_widgets'][row][0].get())
-                WindX['main'].update()
-                time.sleep(0.1)
-                tt = tt - 1
-
-            WindX['main'].title("Sending ["+ WindX['form_widgets'][row][0].get() +"] now ...")
         
-        #print("Mouse click position:",str(pos[0]), str(pos[1]))
-        #win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
-        #win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
-        else:
-            n = len(WindX['mouse_click_points'])
-            x = WindX['mouse_click_points'][n - 2][0]
-            y = WindX['mouse_click_points'][n - 2][1]
-            left, top, right, bottom = win32gui.GetWindowRect(WindX['FGW'][1][0])
-            if n >= 2 and (x >= left and x <= right and y >= top and y <= bottom):
-                #print(WindX['mouse_click_points'])
-                print("Click on this point (",x, y,")", WindX['FGW'][1])
-                imouse = mouse.Controller()
-                imouse.position = (x, y)
-                imouse.click(mouse.Button.left, 1)
+        try:
+            if t:
+                tt = int(t)*10
+                while tt:
+                    WindX['main'].title("{:>02d}".format(tt) + " Sending: "+ WindX['form_widgets'][row][0].get())
+                    WindX['main'].update()
+                    time.sleep(0.1)
+                    tt = tt - 1
+
+                WindX['main'].title("Sending ["+ WindX['form_widgets'][row][0].get() +"] now ...")
+            
+            #print("Mouse click position:",str(pos[0]), str(pos[1]))
+            #win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
+            #win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
             else:
-                WinFocusOn()
+                n = len(WindX['mouse_click_points'])
+                x = WindX['mouse_click_points'][n - 2][0]
+                y = WindX['mouse_click_points'][n - 2][1]
+                left, top, right, bottom = win32gui.GetWindowRect(WindX['FGW'][1][0])
+                if n >= 2 and (x >= left and x <= right and y >= top and y <= bottom):
+                    #print(WindX['mouse_click_points'])
+                    print("Click to focus on this point (",x, y,")", WindX['FGW'][1])
+                    imouse = mouse.Controller()
+                    imouse.position = (x, y)
+                    time.sleep(1)
+                    imouse.click(mouse.Button.left, 1)
+                else:
+                    WinFocusOn()
 
-        SendString(WindX['form_widgets'][row][1].get())
-        WindX['win_not_sending_key'] = 1
-        WindX['mouse_click_points'] = []
+            SendString(WindX['form_widgets'][row][1].get())
+            WindX['win_not_sending_key'] = 1
+            WindX['mouse_click_points'] = []
 
-        if not t:
-            win32api.SetCursorPos(pos)
+            if not t:
+                win32api.SetCursorPos(pos)
+        except:
+            print(traceback.format_exc())
 
     elif act == "delete":
         #delete the row
@@ -253,10 +279,184 @@ def PSWaction(row=0,act=None):
             'ischeck': 0
         }
 
-        UIaddNewRow(WindX['Frame1'], para)
+        UIaddNewRow(WindX['Frame1'], para, True)
+
+    elif act == 'Anchor':
+        WinAnchor()
+
+    elif act == 'LoginCiscoVPN':
+        LoginCiscoVPN()
 
     WindX['main'].title("My Wallet")
     SeeMe(None,WindX['e_EncryptCode'],'*')
+
+def WinAnchor():
+    #gs = re.split(r'x|\+', WindX['main'].geometry()) #506x152+-1418+224
+    WindX['main'].geometry('+0+0')
+
+def processinfo(processName):
+    pids = psutil.pids()
+    res = False
+    for pid in pids:
+        # print(pid)
+        p = psutil.Process(pid)
+        try:
+            #print(p.name())
+            if str(p.name()).upper() == str(processName).upper():
+                print('--- killing pid ', pid)
+                print(os.popen('taskkill.exe /pid '+str(pid)))
+                res = True  # 如果找到该进程则打印它的PID，返回true
+                break
+        except:
+            pass
+
+    return res  # 没有找到该进程，返回false
+
+def LoginCiscoVPN():
+    print("\nLogin Cisco VPN ...")
+    
+    if not (WindX['LoginPSW'] and WindX['LoginSCD']):
+        return
+
+    hwnd = win32gui.FindWindow(0, 'Cisco AnyConnect Secure Mobility Client')
+    if hwnd:
+        print(hwnd, win32gui.GetWindowText(hwnd),'--- existing!')
+        print("Find and kill vpnui.exe process:", processinfo('vpnui.exe'))
+        #return
+
+    t1 = threading.Timer(1,LoginCiscoVPN_Open)
+    t1.start() 
+
+    isVPNopen = 0
+    hwnd = None
+    while not isVPNopen:
+        hwnd = win32gui.FindWindow(0, 'Cisco AnyConnect Secure Mobility Client')
+        if hwnd:
+            isVPNopen = 1
+        else:
+            print("\t... wait for: Cisco AnyConnect Secure Mobility Client, 3 seconds")
+            time.sleep(3)
+
+    if hwnd:
+        imouse = mouse.Controller()
+        keyboard = keyboardX.Controller()
+        
+        #Title = Cisco AnyConnect Secure Mobility Client
+        fgwHandle1 = Wind_Input_Submit('Input IP',hwnd,[180, 112, 340, 112], imouse,keyboard, '218.107.14.4')
+        if fgwHandle1 and (not fgwHandle1 == hwnd) and win32gui.GetWindowText(fgwHandle1)=='Cisco AnyConnect Secure Mobility Client':
+            #Title = Cisco AnyConnect Secure Mobility Client
+            fgwHandle2 = Wind2ClickButton('Confirmed IP 218.107.14.4',fgwHandle1, [250, 288],imouse)
+            if fgwHandle2 and (not fgwHandle2 == fgwHandle1) and win32gui.GetWindowText(fgwHandle2)=='Cisco AnyConnect | 218.107.14.4':
+                #Title = Cisco AnyConnect | 218.107.14.4
+                fgwHandle3 = Wind_Input_Submit('Input Password',fgwHandle2,[155, 146, 220, 204], imouse,keyboard, WindX['LoginPSW'])
+
+                if fgwHandle3 and (not fgwHandle2 == fgwHandle3) and win32gui.GetWindowText(fgwHandle3)=='Cisco AnyConnect | 218.107.14.4':
+                    #Title = Cisco AnyConnect | 218.107.14.4
+                    fgwHandle4 = Wind_Input_Submit('Input Code Option',fgwHandle3,[145, 85, 188, 253], imouse,keyboard, '3')
+
+                    if fgwHandle4 and (not fgwHandle4 == fgwHandle3) and win32gui.GetWindowText(fgwHandle4)=='Cisco AnyConnect | 218.107.14.4':
+                        #Title = Cisco AnyConnect | 218.107.14.4
+                        fgwHandle5 = Wind_Input_Submit('Input Code value',fgwHandle4,[145, 89, 188, 253], imouse,keyboard, WindX['LoginSCD'])
+
+                        if fgwHandle5 and (not fgwHandle4 == fgwHandle5) and win32gui.GetWindowText(fgwHandle5)=='Cisco AnyConnect':
+                            #Title = Cisco AnyConnect
+                            Wind2ClickButton('Accept and complete',fgwHandle5, [216, 187],imouse)
+                        else:
+                            print("\n--- Catch wrong window (5 Accept and complete):", win32gui.GetWindowText(fgwHandle5), fgwHandle5, fgwHandle4)
+                    else:
+                        print("\n--- Catch wrong window (4 Input Code value):", win32gui.GetWindowText(fgwHandle4), fgwHandle4, fgwHandle3) 
+                else:
+                    print("\n--- Catch wrong window (3 Input Code Option):", win32gui.GetWindowText(fgwHandle3), fgwHandle3, fgwHandle2)
+            else:
+                print("\n--- Catch wrong window (2 Input Password):", win32gui.GetWindowText(fgwHandle2), fgwHandle2, fgwHandle1)
+        else:
+            print("\n--- Catch wrong window (1 Confirmed IP):", win32gui.GetWindowText(fgwHandle1), fgwHandle1, hwnd)
+
+def Wind_Input_Submit(todo,hwnd,offsetXY,imouse,keyboard,str_in):
+    print("\n" + todo)
+    rect = win32gui.GetWindowRect(hwnd)  #left, top, right, bottom
+    print(hwnd, win32gui.GetWindowText(hwnd), rect)
+    win32gui.SetForegroundWindow(hwnd)
+
+    x = rect[0] + offsetXY[0]
+    y = rect[1] + offsetXY[1]
+    print("Click on this point (",x, y,")")
+    imouse.position = (x, y)
+    time.sleep(1)
+    imouse.click(mouse.Button.left, 1)
+
+    with keyboard.pressed(keyboardX.Key.ctrl):
+        keyboard.press('a')
+        keyboard.release('a')
+
+    for i in range(100):
+        keyboard.press(keyboardX.Key.backspace)
+        keyboard.release(keyboardX.Key.backspace)
+
+    keyboard.type(str_in)
+
+    x = rect[0] + offsetXY[2]
+    y = rect[1] + offsetXY[3]
+    print("Click on this point (",x, y,")")
+    imouse.position = (x, y)
+    time.sleep(1)
+    imouse.click(mouse.Button.left, 1)
+
+    time.sleep(5)
+    return win32gui.GetForegroundWindow()
+
+def Wind2ClickButton(todo,hwnd,offsetXY,imouse):
+    print("\n" + todo)
+
+    rect = win32gui.GetWindowRect(hwnd)  #left, top, right, bottom
+    print(hwnd, win32gui.GetWindowText(hwnd), rect)
+
+    x = rect[0] + offsetXY[0]
+    y = rect[1] + offsetXY[1]
+    print("Click on this point (",x, y,")")
+    imouse.position = (x, y)
+    time.sleep(1)
+    imouse.click(mouse.Button.left, 1)
+
+    time.sleep(5)
+    return win32gui.GetForegroundWindow()
+
+
+def LoginCiscoVPN_Open():    
+    p = subprocess.Popen('C:/Program Files (x86)/Cisco/Cisco AnyConnect Secure Mobility Client/vpnui.exe', shell=True)
+
+
+def FindChildWinds(wxs, hwnd, xhwndChild= None,wantedClass= None, wantedText= None):
+    if not wxs.__contains__(hwnd):
+        wxs[str(hwnd)] = {}
+
+    go = 1
+    c = 0
+    checkedChilds = {}
+    while go:
+        print(c, hwnd, xhwndChild, wantedClass, wantedText)
+        hwndChild = win32gui.FindWindowEx(hwnd, xhwndChild, wantedClass, wantedText)
+        if hwndChild:
+            if not wxs[str(hwnd)].__contains__(str(hwndChild)):
+                print("\t",hwnd, hwndChild, 'Class:[' + str(win32gui.GetClassName(hwndChild)) + ']  Text:['+  str(win32gui.GetWindowText(hwndChild)) + ']',"\n")
+                wxs[str(hwnd)][str(hwndChild)] = {}
+                checkedChilds[hwndChild] = 0
+                c=0
+            else:
+                c +=1
+
+        if c > 8:
+            xhwndChild = None
+            for xch in checkedChilds:
+                if checkedChilds[xch] == 0:
+                    xhwndChild = xch
+                    checkedChilds[xch] = 1
+
+            if not xhwndChild:
+                go = 0
+
+    #for hwndChild in wxs[str(hwnd)]:
+    #    FindChildWinds(wxs[str(hwnd)][hwndChild], hwndChild, None, wantedClass, wantedText)
 
 def OpenFile(filepath):    
     print("\t.... Open file:",filepath)
@@ -419,6 +619,8 @@ def ShowHideBasic():
         WindX['win_pos']['orig_width'] = WindX['main'].winfo_width()        
 
     if WindX['ShowHideBasic'] == 1:
+        EnableEntry(wid=WindX['main'], state="disabled", act=1)
+
         WindX['ShowHideBasic'] = 0
         WindX['Frame1'].grid_remove()
         WindX['Frame2'].grid_remove()
@@ -431,13 +633,16 @@ def ShowHideBasic():
             WindX['win_pos']['toolbar_height'] = WindX['main'].winfo_height()
 
         WindX['main'].geometry(str(WindX['win_pos']['orig_width']) + 'x' + str(WindX['win_pos']['toolbar_height']) + '+' + WindX['win_pos']['geo_xy'])
-
+        WindX['main'].overrideredirect(1)
     else:
+        EnableEntry(wid=WindX['main'], state="normal", act=1)
+
         WindX['main'].geometry("")
         WindX['ShowHideBasic'] = 1
         WindX['Frame1'].grid()
         WindX['Frame2'].grid()
         WindX['e_HideBase'].config(text="  ∧ ")
+        WindX['main'].overrideredirect(0)
 
 def Init(IsInit=1):          
     WindX['main'] = Tix.Tk()
@@ -496,6 +701,12 @@ def Init(IsInit=1):
         iSeparator(WindX['Frame2'],row,5)
         WindX['winBalloon'].bind_widget(b.b, balloonmsg= 'Add new row')
 
+        b = iButton(WindX['Frame2'],row,6,lambda:PSWaction(0,"Anchor"),'Anchor', width=10)  
+        WindX['winBalloon'].bind_widget(b.b, balloonmsg= 'Anchor at the point (0,0)')
+
+        b = iButton(WindX['Frame2'],row,7,lambda:PSWaction(0,"LoginCiscoVPN"),'Cisco VPN', width=10)  
+        WindX['winBalloon'].bind_widget(b.b, balloonmsg= 'Login Cisco VPN')
+
     if WindX['Frame3']: 
         b = iButton(WindX['Frame3'],0,1,ShowHideBasic,hideshow_icon, width=4)
         WindX['e_HideBase'] = b.b  
@@ -516,7 +727,7 @@ def ColumnPadx(col):
     else:
         return 0
 
-def UIaddNewRow(form, para):
+def UIaddNewRow(form, para,addNew=None):
     WindX['form_rows'] +=1
     row = WindX['form_rows']
     col = 0
@@ -538,7 +749,8 @@ def UIaddNewRow(form, para):
     ef.insert(0,para['field_name'])
     ef.bind('<FocusIn>',func=handlerAdaptor(CapLockStatus,e=ef))
     ef.bind('<KeyRelease>',func=handlerAdaptor(CapLockStatus,e=ef))
-    ef.focus()
+    if addNew:
+        ef.focus()
     WindX['winBalloon'].bind_widget(ef, balloonmsg= 'Field Name')
 
     col +=1
@@ -575,6 +787,13 @@ def UIaddNewRow(form, para):
         bs = iButton(WindX['Frame3'],0,WindX['Frame3_colnum'],lambda:PSWaction(row,"send"),para['field_name_short'],p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',4,E+W+N+S,1,1])
         WindX['form_widgets_short'][WindX['Frame3_colnum']] = bs.b
         WindX['winBalloon'].bind_widget(bs.b, balloonmsg= para['field_name'])
+
+    if para['field_name_short'] == 'JPSW':
+        WindX['LoginPSW'] = para['field_value']
+    elif para['field_name_short'] == 'JCOD':
+        WindX['LoginSCD'] = para['field_value']
+    elif para['field_name_short'] == 'JWID':
+        WindX['LoginID']  = para['field_value']
 
 #---------------------------------
 #Structure for a keycode input
@@ -776,6 +995,7 @@ def MouseOnClick(x, y, button, pressed):
 def MouseListener():
     with Listener(on_click=MouseOnClick) as listener: #(on_move=on_move, on_click=on_click, on_scroll=on_scroll) 
         listener.join()
+
 
 if __name__ == "__main__": 
     WindX['win_not_sending_key'] = 1
