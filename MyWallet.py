@@ -12,9 +12,12 @@ import win32api
 import win32con
 import win32com.client
 import win32process
+import win32clipboard
 
 from tkinter import *
 from tkinter import filedialog,messagebox,tix as Tix
+import tkinter.font as tf
+
 from pynput import mouse
 from pynput.mouse import Listener
 from pynput import keyboard as keyboardX
@@ -30,6 +33,7 @@ import random, string
 import threading
 import subprocess
 import psutil
+import ctypes
 
 WindX  = {}
 WindXX = {}
@@ -54,11 +58,13 @@ WindX['form_widgets_short'] = {}
 WindX['e_warnLabel'] = None
 WindX['win_pos'] = {'orig_width':0, 'geo_xy':'', 'toolbar_height':0}  
 WindX['mouse_click_points'] = []
+WindX['TopLevel'] = None
+WindX['TopLevel_Label'] = None
 
 def WinFocusOn():    
     if len(WindX['FGW'][1]):
         try:           
-            l, t, r, b = win32gui.GetWindowRect(WindX['FGW'][1][0])
+            l, t, r, b = get_window_rect(WindX['FGW'][1][0])
             print(".... SetForegroundWindow:",WindX['FGW'][1], l, t, r, b)                    
             win32gui.SetForegroundWindow(WindX['FGW'][1][0])
 
@@ -102,8 +108,76 @@ def EnableEntry(wid=None, state="normal", act=1):
     except:
         pass
 
+def Clipboard_Empty():
+    win32clipboard.OpenClipboard()
+    win32clipboard.EmptyClipboard()
+    win32clipboard.CloseClipboard()
+
+def SendStrViaClipboard(text):
+    try:
+        win32clipboard.OpenClipboard()
+        win32clipboard.EmptyClipboard()
+        win32clipboard.SetClipboardData(win32con.CF_UNICODETEXT, text)
+        time.sleep(0.1)
+
+        ctr = keyboardX.Controller()
+        with ctr.pressed(keyboardX.Key.ctrl,"a"):
+            pass
+        with ctr.pressed(keyboardX.Key.delete):
+            pass
+
+        #print(".. paste text from clipboard:", win32clipboard.GetClipboardData(win32con.CF_UNICODETEXT))
+        with ctr.pressed(keyboardX.Key.ctrl,"v"):
+            pass
+
+        #time.sleep(0.2)
+        #win32clipboard.EmptyClipboard()
+        win32clipboard.CloseClipboard()
+    except:
+        win32clipboard.CloseClipboard()
+        print(traceback.format_exc())
+
+def get_window_rect(hwnd):
+    try:
+        f = ctypes.windll.dwmapi.DwmGetWindowAttribute
+    except WindowsError:
+        f = None
+    if f:
+        rect = ctypes.wintypes.RECT()
+        DWMWA_EXTENDED_FRAME_BOUNDS = 9
+        f(ctypes.wintypes.HWND(hwnd),
+          ctypes.wintypes.DWORD(DWMWA_EXTENDED_FRAME_BOUNDS),
+          ctypes.byref(rect),
+          ctypes.sizeof(rect)
+          )
+        return rect.left, rect.top, rect.right, rect.bottom
+
+def Message(msg, bgColor, fgColor):
+    if WindX['TopLevel']:
+        WindX['TopLevel_Label'].config(text=msg,bg=bgColor, fg=fgColor)
+        return
+        #WindX['TopLevel'].destroy()
+
+    WindX['TopLevel'] = Toplevel()
+    WindX['TopLevel'].wm_attributes('-topmost',1)        
+    pos = win32api.GetCursorPos()
+    WindX['TopLevel'].geometry('+'+ str(pos[0]) +'+' + str(pos[1] + 20))
+    WindX['TopLevel'].overrideredirect(1)
+
+    font_type = None 
+    try:
+        font_type = tf.Font(family="Lucida Grande")  #, size=12
+    except:
+        pass
+    label = Label(WindX['TopLevel'], text=msg, justify=LEFT, relief=FLAT,pady=3,padx=3, anchor='w', bg=bgColor, fg=fgColor, font=font_type)
+    label.pack(side=TOP, fill=X)
+    WindX['TopLevel_Label'] = label
+
 def PSWaction(row=0,act=None):
     #print("psw action",row,act)
+    if WindX['TopLevel']:
+        WindX['TopLevel'].destroy()
+        WindX['TopLevel'] = None
 
     if WindX['e_warnLabel']:
         try:
@@ -115,9 +189,20 @@ def PSWaction(row=0,act=None):
     if act == "send":
         #WindX['form_widgets'][row] = [sv_fieldname, sv_value, bdelete.b, ef, ev, bsend.b]
         #   
-        #                            0             1         2          3   4   5    
+        #                            0             1         2          3   4   5        
+        WindX['main'].title("My Wallet")    
         if WindX['form_widgets'][row][1].get() == 'LoginCiscoVPN':
             LoginCiscoVPN()
+            return
+
+        #print("Action ("+act+") - to Foreground Window:", WindX['FGW'])
+        if WindX['FGW'][1][1] == "My Wallet":
+            print(".. You can not input to self main window!")
+            return
+
+        left, top, right, bottom = get_window_rect(WindX['FGW'][1][0])
+        if left + top + right + bottom == 0:
+            print(".. Invalid window -", WindX['FGW'][1])
             return
 
         pos = win32api.GetCursorPos()
@@ -128,46 +213,69 @@ def PSWaction(row=0,act=None):
             t = 0
         else:
             t = int(t)*1
+            if t > 10:
+                t = 10
         WindX['e_delay2send'].insert(0,str(t))
         
         try:
-            if t:
+            if t:               
                 tt = int(t)*10
+                xmsg = " Sending: "+ WindX['form_widgets'][row][0].get() + ", please set foucs where you need to input!"
                 while tt:
-                    WindX['main'].title("{:>02d}".format(tt) + " Sending: "+ WindX['form_widgets'][row][0].get())
+                    #WindX['main'].title("{:>02d}".format(tt) + " Sending: "+ WindX['form_widgets'][row][0].get())
+                    Message("{:>02d}".format(tt) + xmsg, 'yellow', 'red')
                     WindX['main'].update()
                     time.sleep(0.1)
                     tt = tt - 1
-
-                WindX['main'].title("Sending ["+ WindX['form_widgets'][row][0].get() +"] now ...")
+                #WindX['main'].title("Sending ["+ WindX['form_widgets'][row][0].get() +"] now ...")
+                Message(xmsg, 'yellow', 'red')
             
-            #print("Mouse click position:",str(pos[0]), str(pos[1]))
-            #win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
-            #win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
             else:
                 n = len(WindX['mouse_click_points'])
-                x = WindX['mouse_click_points'][n - 2][0]
-                y = WindX['mouse_click_points'][n - 2][1]
-                left, top, right, bottom = win32gui.GetWindowRect(WindX['FGW'][1][0])
-                if n >= 2 and (x >= left and x <= right and y >= top and y <= bottom):
-                    #print(WindX['mouse_click_points'])
-                    print("Click to focus on this point (",x, y,")", WindX['FGW'][1])
-                    imouse = mouse.Controller()
-                    imouse.position = (x, y)
-                    time.sleep(1)
-                    imouse.click(mouse.Button.left, 1)
+                if n >= 2:
+                    win32gui.SetForegroundWindow(WindX['FGW'][1][0])
+                    
+                    x = WindX['mouse_click_points'][n - 2][0]
+                    y = WindX['mouse_click_points'][n - 2][1]
+                    left, top, right, bottom = get_window_rect(WindX['FGW'][1][0])  #win32gui.GetWindowRect(WindX['FGW'][1][0])
+                    if x >= left and x <= right and y >= top and y <= bottom:
+                        #print(WindX['mouse_click_points'])
+                        print("Click to focus on this point (",x, y,")", WindX['FGW'][1])
+                        imouse = mouse.Controller()
+                        imouse.position = (x, y)
+                        time.sleep(1)
+                        imouse.click(mouse.Button.left, 1)
+                    else:
+                        WinFocusOn()
                 else:
                     WinFocusOn()
 
-            kb = keyboardX.Controller()
             kstr = str(WindX['form_widgets'][row][1].get())
             #print('send key string:', kstr )
-            kb.type(kstr)
+
+            fgwHandle = win32gui.GetForegroundWindow()
+            if fgwHandle and win32gui.GetWindowText(fgwHandle) == "My Wallet":
+                print(".. You can not input to self main window!")
+                if WindX['TopLevel']:
+                    WindX['TopLevel'].destroy()
+                    WindX['TopLevel'] = None
+                return
+            elif not fgwHandle:
+                print(".. No focus foreground window!")
+                if WindX['TopLevel']:
+                    WindX['TopLevel'].destroy()
+                    WindX['TopLevel'] = None
+                return
+
+            SendStrViaClipboard(kstr)
+            #kb = keyboardX.Controller()
+            #kb.type(kstr)   #please make sure your keyboard with a right language setting
 
             WindX['win_not_sending_key'] = 1
             WindX['mouse_click_points'] = []
 
             if not t:
+                time.sleep(0.2)
                 win32api.SetCursorPos(pos)
         except:
             print(traceback.format_exc())
@@ -295,6 +403,10 @@ def PSWaction(row=0,act=None):
     WindX['main'].title("My Wallet")
     SeeMe(None,WindX['e_EncryptCode'],'*')
 
+    if WindX['TopLevel']:
+        WindX['TopLevel'].destroy()
+        WindX['TopLevel'] = None
+
 def WinAnchor():
     #gs = re.split(r'x|\+', WindX['main'].geometry()) #506x152+-1418+224
     WindX['main'].geometry('+0+0')
@@ -343,6 +455,7 @@ def LoginCiscoVPN():
             time.sleep(3)
 
     if hwnd:
+        win32gui.SetForegroundWindow(hwnd)
         imouse = mouse.Controller()
         keyboard = keyboardX.Controller()
         
@@ -377,9 +490,12 @@ def LoginCiscoVPN():
         else:
             print("\n--- Catch wrong window (1 Confirmed IP):", win32gui.GetWindowText(fgwHandle1), fgwHandle1, hwnd)
 
+def LoginCiscoVPN_Open():    
+    p = subprocess.Popen('C:/Program Files (x86)/Cisco/Cisco AnyConnect Secure Mobility Client/vpnui.exe', shell=True)
+
 def Wind_Input_Submit(todo,hwnd,offsetXY,imouse,keyboard,str_in):
-    print("\n" + todo)
-    rect = win32gui.GetWindowRect(hwnd)  #left, top, right, bottom
+    print("\n" + todo, hwnd,offsetXY,imouse,keyboard,str_in)
+    rect = get_window_rect(hwnd)  #left, top, right, bottom
     print(hwnd, win32gui.GetWindowText(hwnd), rect)
     win32gui.SetForegroundWindow(hwnd)
 
@@ -413,7 +529,7 @@ def Wind_Input_Submit(todo,hwnd,offsetXY,imouse,keyboard,str_in):
 def Wind2ClickButton(todo,hwnd,offsetXY,imouse):
     print("\n" + todo)
 
-    rect = win32gui.GetWindowRect(hwnd)  #left, top, right, bottom
+    rect = get_window_rect(hwnd)  #left, top, right, bottom
     print(hwnd, win32gui.GetWindowText(hwnd), rect)
 
     x = rect[0] + offsetXY[0]
@@ -425,11 +541,6 @@ def Wind2ClickButton(todo,hwnd,offsetXY,imouse):
 
     time.sleep(5)
     return win32gui.GetForegroundWindow()
-
-
-def LoginCiscoVPN_Open():    
-    p = subprocess.Popen('C:/Program Files (x86)/Cisco/Cisco AnyConnect Secure Mobility Client/vpnui.exe', shell=True)
-
 
 def FindChildWinds(wxs, hwnd, xhwndChild= None,wantedClass= None, wantedText= None):
     if not wxs.__contains__(hwnd):
@@ -591,7 +702,12 @@ def CapLockStatus(event,e=None):
 
     SeeMe(event,e)
 
-def WindExit():           
+def WindExit():       
+    Clipboard_Empty()
+    if WindX['TopLevel']:
+        WindX['TopLevel'].destroy()
+        WindX['TopLevel'] = None
+
     WindX['main'].destroy()    
     os._exit(0)
     #sys.exit(0)  # This will cause the window error: Python has stopped working ...
@@ -779,7 +895,7 @@ def UIaddNewRow(form, para,addNew=None):
 
     col +=1
     bsend = iButton(form,WindX['form_rows'],col,lambda:PSWaction(row,"send"),'Send',p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',6,E+W+N+S,pady_row,ColumnPadx(col)])
-    WindX['winBalloon'].bind_widget(bsend.b, balloonmsg= 'Send field value')
+    WindX['winBalloon'].bind_widget(bsend.b, balloonmsg= 'Send field value of ' + para['field_name'])
 
     col +=1
     bdelete = iButton(form,WindX['form_rows'],col,lambda:PSWaction(row,"delete"),'x',fg='red',p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',3,E+W+N+S,pady_row,ColumnPadx(col)])
@@ -860,37 +976,55 @@ class iButton:
 def main():
     Init()
 
+def ForeGroundWindow():
+    try:
+        fgwHandle = win32gui.GetForegroundWindow()
+        if fgwHandle and WindX['win_not_sending_key']:
+            title = win32gui.GetWindowText(fgwHandle)
+            if title == "My Wallet":
+                return
+            WindX['FGW'][1] = [fgwHandle, title]
+
+            '''
+            if len(WindX['FGW'][1]) == 0:
+                WindX['FGW'][1] = [fgwHandle, win32gui.GetWindowText(fgwHandle)]
+                #print("FGW", WindX['FGW'])
+
+            elif len(WindX['FGW'][2]) == 0:
+                WindX['FGW'][2] = [fgwHandle, win32gui.GetWindowText(fgwHandle)]
+                #print("FGW", WindX['FGW'])
+
+            elif not (fgwHandle == WindX['FGW'][2][0]):
+                WindX['FGW'][1] = WindX['FGW'][2]
+                WindX['FGW'][2] = [fgwHandle, win32gui.GetWindowText(fgwHandle)]
+                #print("FGW", WindX['FGW'])
+            '''
+    except:
+        print(traceback.format_exc()) 
+
 def ForeGroundWindowsCheck():
     WindX['FGW'] = {1:[],2:[]}
 
     while True:
-        try:
-            fgwHandle = win32gui.GetForegroundWindow()
-            if fgwHandle and WindX['win_not_sending_key']:    
-                if len(WindX['FGW'][1]) == 0:
-                    WindX['FGW'][1] = [fgwHandle, win32gui.GetWindowText(fgwHandle)]
-                    #print("FGW", WindX['FGW'])
-
-                elif len(WindX['FGW'][2]) == 0:
-                    WindX['FGW'][2] = [fgwHandle, win32gui.GetWindowText(fgwHandle)]
-                    #print("FGW", WindX['FGW'])
-
-                elif not (fgwHandle == WindX['FGW'][2][0]):
-                    WindX['FGW'][1] = WindX['FGW'][2]
-                    WindX['FGW'][2] = [fgwHandle, win32gui.GetWindowText(fgwHandle)]
-                    #print("FGW", WindX['FGW'])
-        except:
-            print(traceback.format_exc()) 
-
+        ForeGroundWindow()
         time.sleep(0.1)
 
 def MouseOnClick(x, y, button, pressed):
     #print(button,'{0} at {1}'.format('Pressed' if pressed else 'Released', (x, y)))
     if re.match(r'.*left',str(button),re.I) and (not pressed):
         WindX['mouse_click_points'].append([x,y])
+        ForeGroundWindow()
+        #print("mouse click - Foreground Window:", WindX['FGW'])
+
+def MouseOnMove(x, y):
+    try:
+        if WindX['TopLevel']: 
+            WindX['TopLevel'].geometry('+'+ str(x) +'+' + str(y + 20))
+    except:
+        pass
 
 def MouseListener():
-    with Listener(on_click=MouseOnClick) as listener: #(on_move=on_move, on_click=on_click, on_scroll=on_scroll) 
+    with Listener(on_click=MouseOnClick, on_move=MouseOnMove) as listener: #(on_move=on_move, on_click=on_click, on_scroll=on_scroll) 
         listener.join()
 
 
