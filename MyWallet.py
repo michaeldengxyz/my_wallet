@@ -113,26 +113,24 @@ def Clipboard_Empty():
     win32clipboard.EmptyClipboard()
     win32clipboard.CloseClipboard()
 
-def SendStrViaClipboard(text):
+def SendStrViaClipboard(text,delstr=False):
     try:
         win32clipboard.OpenClipboard()
         win32clipboard.EmptyClipboard()
         win32clipboard.SetClipboardData(win32con.CF_UNICODETEXT, text)
-        time.sleep(0.1)
+        win32clipboard.CloseClipboard()
+        #time.sleep(0.1)
 
         ctr = keyboardX.Controller()
-        with ctr.pressed(keyboardX.Key.ctrl,"a"):
-            pass
-        with ctr.pressed(keyboardX.Key.delete):
-            pass
+        if delstr:
+            with ctr.pressed(keyboardX.Key.ctrl,"a"):
+                pass
+            with ctr.pressed(keyboardX.Key.delete):
+                pass
 
-        #print(".. paste text from clipboard:", win32clipboard.GetClipboardData(win32con.CF_UNICODETEXT))
+        #print(".. paste text from clipboard:", win32clipboard.GetClipboardData(win32con.CF_UNICODETEXT)) dengmmeDDY#$JABIL22xSHANGHAI218.107.14.4
         with ctr.pressed(keyboardX.Key.ctrl,"v"):
-            pass
-
-        #time.sleep(0.2)
-        #win32clipboard.EmptyClipboard()
-        win32clipboard.CloseClipboard()
+            pass   
     except:
         win32clipboard.CloseClipboard()
         print(traceback.format_exc())
@@ -243,7 +241,7 @@ def PSWaction(row=0,act=None):
                         print("Click to focus on this point (",x, y,")", WindX['FGW'][1])
                         imouse = mouse.Controller()
                         imouse.position = (x, y)
-                        time.sleep(1)
+                        time.sleep(0.2)
                         imouse.click(mouse.Button.left, 1)
                     else:
                         WinFocusOn()
@@ -506,6 +504,7 @@ def Wind_Input_Submit(todo,hwnd,offsetXY,imouse,keyboard,str_in):
     time.sleep(1)
     imouse.click(mouse.Button.left, 1)
 
+    '''
     with keyboard.pressed(keyboardX.Key.ctrl):
         keyboard.press('a')
         keyboard.release('a')
@@ -515,6 +514,8 @@ def Wind_Input_Submit(todo,hwnd,offsetXY,imouse,keyboard,str_in):
         keyboard.release(keyboardX.Key.backspace)
 
     keyboard.type(str_in)
+    '''
+    SendStrViaClipboard(str_in,delstr=True)
 
     x = rect[0] + offsetXY[2]
     y = rect[1] + offsetXY[3]
