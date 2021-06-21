@@ -1,6 +1,6 @@
 #Pyhton 3.x
 # -*- coding: UTF-8 -*-
-# rev.2.0.0.0
+# rev.2.0.0.1
 
 import time 
 import traceback
@@ -60,6 +60,10 @@ WindX['win_pos'] = {'orig_width':0, 'geo_xy':'', 'toolbar_height':0}
 WindX['mouse_click_points'] = []
 WindX['TopLevel'] = None
 WindX['TopLevel_Label'] = None
+WindX['top_buttons'] = []
+WindX['form_widgets_short_display'] = 1
+WindX['form_widgets_short_display_delay_done'] = 1
+WindX['ShowHideBasic2_thread_timers'] = []
 
 def WinFocusOn():    
     if len(WindX['FGW'][1]):
@@ -349,7 +353,7 @@ def PSWaction(row=0,act=None):
                 #print(data)
                 if data.__contains__('1'):     
                     if WindX['Frame3_colnum'] > 1:               
-                        for i in range(2,WindX['Frame3_colnum']+1):
+                        for i in range(3,WindX['Frame3_colnum']+1):
                             if WindX['form_widgets_short'].__contains__(i):
                                 WindX['form_widgets_short'][i].destroy()
 
@@ -361,7 +365,7 @@ def PSWaction(row=0,act=None):
                     WindX['form_widgets'] = {}
                     WindX['form_rows'] =1
                     WindX['form_widgets_short'] = {}
-                    WindX['Frame3_colnum'] = 1                    
+                    WindX['Frame3_colnum'] = 2                    
 
                     for i in data:
                         if not i == 'others':
@@ -376,6 +380,7 @@ def PSWaction(row=0,act=None):
                                         'field_name_short': data[i]['field_name_short'],
                                         'ischeck': data[i]['ischeck']
                                         })
+
                 else:
                     print("No data in your wallet!")
                     messagebox.showwarning(title='Warning', message="No data in your wallet!")
@@ -736,6 +741,86 @@ def InputCheck():
         
     return yes   
 
+def ShowHideBasic2_Delay_countdown(t=30):
+    while t > 0 and WindX['form_widgets_short_display_delay_done'] == 0 and WindX['ShowHideBasic'] == 0:
+        WindX['e_HideToolbar'].config(text=" < : " + str(t) + " ")
+        WindX['main'].update()
+        t -= 1
+        time.sleep(1)
+
+    WindX['e_HideToolbar'].config(text="  < ")
+
+def ShowHideBasic2_Delay(delaySeconds=30):
+    if WindX['form_widgets_short_display_delay_done']:
+        WindX['form_widgets_short_display_delay_done'] = 0
+        if len(WindX['ShowHideBasic2_thread_timers']):
+            for t in WindX['ShowHideBasic2_thread_timers']:
+                try:
+                    t.cancel()
+                except:
+                    print(traceback.format_exc()) 
+        WindX['ShowHideBasic2_thread_timers'] = []
+
+        t1 = threading.Timer(delaySeconds,ShowHideBasic2)        
+        WindX['ShowHideBasic2_thread_timers'].append(t1)
+
+        if delaySeconds > 1:
+            t2 = threading.Timer(0.1,ShowHideBasic2_Delay_countdown)
+            WindX['ShowHideBasic2_thread_timers'].append(t2)
+            t2.start()
+
+        t1.start()         
+
+def ShowHideBasic2X():
+    WindX['form_widgets_short_display_delay_done'] = 1
+    ShowHideBasic2_Delay(0.1)
+
+def ShowHideBasic2(display=False, isForce=False, isDelay=1):
+    if WindX['ShowHideBasic']:
+        if isDelay:
+            WindX['form_widgets_short_display_delay_done'] = 1
+        return
+
+    #print("ShowHideBasic2, display=", display)
+    if len(WindX['form_widgets_short']):
+        for col in WindX['form_widgets_short']:
+            try:
+                if display:
+                    if not WindX['form_widgets_short_display']:
+                        WindX['form_widgets_short'][col].grid()                    
+                else:
+                    if WindX['form_widgets_short_display']:
+                        WindX['form_widgets_short'][col].grid_remove()   
+
+            except:
+                print(traceback.format_exc()) 
+
+    rect = win32gui.GetWindowRect(WindX['e_HideBase'].winfo_id()) #left top right bottom (18, 78, 522, 382)
+    if display:
+        WindX['form_widgets_short_display'] = 1
+        if not isForce:
+            w = WindX['win_pos']['orig_width']
+            if w < rect[2] - rect [0]:
+                w = rect[2] - rect [0]
+            h = WindX['win_pos']['toolbar_height']
+            if h < rect[3] - rect [1]:
+                h = rect[3] - rect [1]
+            WindX['main'].geometry(str(w) + 'x' + str(h) + '+' + WindX['win_pos']['geo_xy'])
+        ShowHideBasic2_Delay()
+    else:
+        WindX['form_widgets_short_display'] = 0        
+        #print('e_HideBase GetWindowRect=',rect)
+        geos = re.split(r'\D',WindX['main'].geometry(),re.I)
+        width_0 = int(geos[0])
+        width_1 = rect[2] - rect [0] + 2
+        while width_0 > width_1:
+            width_0 -= 2
+            WindX['main'].geometry(str(width_0) + 'x' + str(WindX['win_pos']['toolbar_height']) + '+' + WindX['win_pos']['geo_xy'])
+            WindX['main'].update()
+
+    if isDelay:
+        WindX['form_widgets_short_display_delay_done'] = 1
+
 def ShowHideBasic():
     if not WindX['win_pos']['orig_width']:
         WindX['win_pos']['orig_width'] = WindX['main'].winfo_width()        
@@ -754,12 +839,23 @@ def ShowHideBasic():
             WindX['main'].update()
             WindX['win_pos']['toolbar_height'] = WindX['main'].winfo_height()
 
-        WindX['main'].geometry(str(WindX['win_pos']['orig_width']) + 'x' + str(WindX['win_pos']['toolbar_height']) + '+' + WindX['win_pos']['geo_xy'])
+        rect = win32gui.GetWindowRect(WindX['e_HideBase'].winfo_id()) #left top right bottom (18, 78, 522, 382)
+        w = WindX['win_pos']['orig_width']
+        if w < rect[2] - rect [0]:
+            w = rect[2] - rect [0]
+        h = WindX['win_pos']['toolbar_height']
+        if h < rect[3] - rect [1]:
+            h = rect[3] - rect [1]
+        WindX['main'].geometry(str(w) + 'x' + str(h) + '+' + WindX['win_pos']['geo_xy'])
         WindX['main'].overrideredirect(1)
+
+        WindX['form_widgets_short_display_delay_done'] = 1
+        ShowHideBasic2_Delay(10)
     else:
         EnableEntry(wid=WindX['main'], state="normal", act=1)
 
         WindX['main'].geometry("")
+        ShowHideBasic2(True,1,0)
         WindX['ShowHideBasic'] = 1
         WindX['Frame1'].grid()
         WindX['Frame2'].grid()
@@ -834,10 +930,13 @@ def Init(IsInit=1):
         WindX['e_HideBase'] = b.b  
         WindX['ShowHideBasic'] = 1
 
-        WindX['Frame3_colnum'] = 1
+        b = iButton(WindX['Frame3'],0,2,ShowHideBasic2X,' < ', width=4)
+        WindX['e_HideToolbar'] = b.b 
+
+        WindX['Frame3_colnum'] = 2
 
         xlbl = Label(WindX['Frame3'], text='Input [Code], then [Open] to load data ...', justify=CENTER, relief=FLAT,pady=3,padx=3, bg='yellow')
-        xlbl.grid(row=0,column=2,sticky=E+W,columnspan=2)
+        xlbl.grid(row=0,column=3,sticky=E+W,columnspan=2)
         WindX['e_warnLabel'] = xlbl
 
     HideConsole()
@@ -964,12 +1063,16 @@ class iButton:
                 padx=p[9],
                 columnspan=colspan
                 )
+
         self.b.bind('<Motion>',self.iMotion)
         self.b.bind('<Leave>',self.iLeave)
-        self.bg = bg          
+        self.bg = bg 
+        self.txt= txt              
         
     def iMotion(self,event):
         self.b.config(bg = '#FFFFF0')
+        if self.txt== '  ∧  ':
+            ShowHideBasic2(True,0,0)
 
     def iLeave(self,event):
         self.b.config(bg = self.bg)
