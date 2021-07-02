@@ -34,6 +34,8 @@ import threading
 import subprocess
 import psutil
 import ctypes
+import numpy
+from screeninfo import get_monitors
 
 WindX  = {}
 WindXX = {}
@@ -64,6 +66,52 @@ WindX['top_buttons'] = []
 WindX['form_widgets_short_display'] = 1
 WindX['form_widgets_short_display_delay_done'] = 1
 WindX['ShowHideBasic2_thread_timers'] = []
+
+WindX['display_scale'] = []
+
+def GetMonitors():
+    #return
+
+    i = 0
+    scale = 1
+    for m in get_monitors(): 
+        #m   Monitor(x=0, y=0, width=2560, height=1440, width_mm=700, height_mm=390, name='\\\\.\\DISPLAY1')            
+        i +=1        
+        tl = Toplevel()
+        tl.wm_attributes('-topmost',1) 
+        tl.geometry('+'+ str(m.x) +'+' + str(m.y))
+        label = Label(tl, text="get DPI ...", justify=LEFT, relief=FLAT,pady=3,padx=3, anchor='w')
+        label.pack(side=TOP, fill=X)
+        # Set process DPI awareness
+        try:
+            ctypes.windll.shcore.SetProcessDpiAwareness(1)
+        except:
+            ctypes.windll.user32.SetProcessDPIAware()
+        # Create a tkinter window
+        # Get the reported DPI from the window's HWND
+        dpi = ctypes.windll.user32.GetDpiForWindow(tl.winfo_id())
+        # Print the DPI
+        iscale = int(dpi/96*1000)/1000
+        if iscale > scale:
+            scale = iscale
+        print(".. monitors",i,m,dpi,iscale)        
+        WindX['display_scale'].append([m.x, m.x + m.width, iscale])
+        tl.destroy()
+    
+    if scale > 1:
+        WinDefaultFontSet(scale)
+
+def MonitorScale(x=0, y=0, needScaled=False):
+    scale = 1
+
+    if needScaled and len(WindX['display_scale']):
+        for dp in WindX['display_scale']:
+            if x >= dp[0] and x <= dp[1]:
+                scale = dp[2]
+                break
+        print('MonitorScale=',scale)
+
+    return scale
 
 def WinFocusOn():    
     if len(WindX['FGW'][1]):
@@ -98,7 +146,16 @@ def HideConsole():
     except:
         print(traceback.format_exc())
 
-def EnableEntry(wid=None, state="normal", act=1):
+def WinDefaultFontSet(scale):
+    # Creating a Font object of "TkDefaultFont"
+    defaultFont = tf.nametofont("TkDefaultFont")
+    f = defaultFont.configure()
+    print("WinDefaultFont",f) #{'family': 'Segoe UI', 'size': 9, 'weight': 'normal', 'slant': 'roman', 'underline': 0, 'overstrike': 0} 9
+    defaultFont.configure(size= int(f['size']*scale + 0.5))
+
+    WindX['WinDefaultFont_configure'] = f
+
+def WinEnableEntry(wid=None, state="normal", act=1):
     if not wid:
         return
     try:
@@ -108,7 +165,7 @@ def EnableEntry(wid=None, state="normal", act=1):
                 item.configure(state=state)
 
             if item.winfo_children() :
-                EnableEntry(item, state=state, act=act+1)
+                WinEnableEntry(item, state=state, act=act+1)
     except:
         pass
 
@@ -242,9 +299,12 @@ def PSWaction(row=0,act=None):
                     left, top, right, bottom = get_window_rect(WindX['FGW'][1][0])  #win32gui.GetWindowRect(WindX['FGW'][1][0])
                     if x >= left and x <= right and y >= top and y <= bottom:
                         #print(WindX['mouse_click_points'])
-                        print("Click to focus on this point (",x, y,")", WindX['FGW'][1])
+                        
                         imouse = mouse.Controller()
-                        imouse.position = (x, y)
+                        winScale = MonitorScale(x,y)
+                        print("Click to focus on this point (",x, int(x/winScale),',', y,int(y/winScale), ")", WindX['FGW'][1])
+                        imouse.position = (int(x/winScale), int(y/winScale))    #fit to a 100% of Display Scale, and place the mouse at a correct point
+                        #win32api.SetCursorPos((x,y))
                         time.sleep(0.2)
                         imouse.click(mouse.Button.left, 1)
                     else:
@@ -459,29 +519,30 @@ def LoginCiscoVPN():
 
     if hwnd:
         win32gui.SetForegroundWindow(hwnd)
+        time.sleep(1)
         imouse = mouse.Controller()
         keyboard = keyboardX.Controller()
         
         #Title = Cisco AnyConnect Secure Mobility Client
-        fgwHandle1 = Wind_Input_Submit('Input IP',hwnd,[180, 112, 340, 112], imouse,keyboard, '218.107.14.4')
+        fgwHandle1 = Wind_Input_Submit('Input IP',hwnd,[180, 112+34, 340, 112], imouse,keyboard, '218.107.14.4',hit_enter=True)
         if fgwHandle1 and (not fgwHandle1 == hwnd) and win32gui.GetWindowText(fgwHandle1)=='Cisco AnyConnect Secure Mobility Client':
             #Title = Cisco AnyConnect Secure Mobility Client
-            fgwHandle2 = Wind2ClickButton('Confirmed IP 218.107.14.4',fgwHandle1, [250, 288],imouse)
+            fgwHandle2 = Wind2ClickButton('Confirmed IP 218.107.14.4',fgwHandle1, [250, 288+100],imouse)
             if fgwHandle2 and (not fgwHandle2 == fgwHandle1) and win32gui.GetWindowText(fgwHandle2)=='Cisco AnyConnect | 218.107.14.4':
                 #Title = Cisco AnyConnect | 218.107.14.4
-                fgwHandle3 = Wind_Input_Submit('Input Password',fgwHandle2,[155, 146, 220, 204], imouse,keyboard, WindX['LoginPSW'])
+                fgwHandle3 = Wind_Input_Submit('Input Password',fgwHandle2,[155, 146+40, 220, 204], imouse,keyboard, WindX['LoginPSW'],hit_enter=True)
 
                 if fgwHandle3 and (not fgwHandle2 == fgwHandle3) and win32gui.GetWindowText(fgwHandle3)=='Cisco AnyConnect | 218.107.14.4':
                     #Title = Cisco AnyConnect | 218.107.14.4
-                    fgwHandle4 = Wind_Input_Submit('Input Code Option',fgwHandle3,[145, 85, 188, 253], imouse,keyboard, '3')
+                    fgwHandle4 = Wind_Input_Submit('Input Code Option',fgwHandle3,[145, 85+25, 188, 253], imouse,keyboard, '3',hit_enter=True)
 
                     if fgwHandle4 and (not fgwHandle4 == fgwHandle3) and win32gui.GetWindowText(fgwHandle4)=='Cisco AnyConnect | 218.107.14.4':
                         #Title = Cisco AnyConnect | 218.107.14.4
-                        fgwHandle5 = Wind_Input_Submit('Input Code value',fgwHandle4,[145, 89, 188, 253], imouse,keyboard, WindX['LoginSCD'])
+                        fgwHandle5 = Wind_Input_Submit('Input Code value',fgwHandle4,[145, 89+25, 188, 253], imouse,keyboard, WindX['LoginSCD'],hit_enter=True)
 
                         if fgwHandle5 and (not fgwHandle4 == fgwHandle5) and win32gui.GetWindowText(fgwHandle5)=='Cisco AnyConnect':
                             #Title = Cisco AnyConnect
-                            Wind2ClickButton('Accept and complete',fgwHandle5, [216, 187],imouse)
+                            Wind2ClickButton('Accept and complete',fgwHandle5, [216, 187],imouse,hit_enter=True,keyboard=keyboard)
                         else:
                             print("\n--- Catch wrong window (5 Accept and complete):", win32gui.GetWindowText(fgwHandle5), fgwHandle5, fgwHandle4)
                     else:
@@ -496,7 +557,7 @@ def LoginCiscoVPN():
 def LoginCiscoVPN_Open():    
     p = subprocess.Popen('C:/Program Files (x86)/Cisco/Cisco AnyConnect Secure Mobility Client/vpnui.exe', shell=True)
 
-def Wind_Input_Submit(todo,hwnd,offsetXY,imouse,keyboard,str_in):
+def Wind_Input_Submit(todo,hwnd,offsetXY,imouse,keyboard,str_in,hit_enter=False):
     print("\n" + todo, hwnd,offsetXY,imouse,keyboard,str_in)
     rect = get_window_rect(hwnd)  #left, top, right, bottom
     print(hwnd, win32gui.GetWindowText(hwnd), rect)
@@ -504,35 +565,32 @@ def Wind_Input_Submit(todo,hwnd,offsetXY,imouse,keyboard,str_in):
 
     x = rect[0] + offsetXY[0]
     y = rect[1] + offsetXY[1]
-    print("Click on this point (",x, y,")")
-    imouse.position = (x, y)
+    print("Click on this text point (",x, y,"), offset=(", offsetXY[0],offsetXY[1],")")
+    winScale = MonitorScale(x,y)
+    imouse.position = (int(x/winScale), int(y/winScale))
     time.sleep(1)
     imouse.click(mouse.Button.left, 1)
-
-    '''
-    with keyboard.pressed(keyboardX.Key.ctrl):
-        keyboard.press('a')
-        keyboard.release('a')
-
-    for i in range(100):
-        keyboard.press(keyboardX.Key.backspace)
-        keyboard.release(keyboardX.Key.backspace)
-
-    keyboard.type(str_in)
-    '''
     SendStrViaClipboard(str_in,delstr=True)
+    time.sleep(1)
 
     x = rect[0] + offsetXY[2]
-    y = rect[1] + offsetXY[3]
-    print("Click on this point (",x, y,")")
-    imouse.position = (x, y)
+    y = rect[1] + offsetXY[3]    
+    winScale = MonitorScale(x,y)
+    imouse.position = (int(x/winScale), int(y/winScale))
     time.sleep(1)
-    imouse.click(mouse.Button.left, 1)
+
+    if hit_enter:
+        print("keyboard.press(keyboardX.Key.enter)")
+        keyboard.press(keyboardX.Key.enter)
+        keyboard.release(keyboardX.Key.enter)
+    else:
+        print("Click on this button point (",x, y,"), offset=(", offsetXY[2],offsetXY[3],")")
+        imouse.click(mouse.Button.left, 1)
 
     time.sleep(5)
     return win32gui.GetForegroundWindow()
 
-def Wind2ClickButton(todo,hwnd,offsetXY,imouse):
+def Wind2ClickButton(todo,hwnd,offsetXY,imouse,hit_enter=False,keyboard=None):
     print("\n" + todo)
 
     rect = get_window_rect(hwnd)  #left, top, right, bottom
@@ -540,10 +598,18 @@ def Wind2ClickButton(todo,hwnd,offsetXY,imouse):
 
     x = rect[0] + offsetXY[0]
     y = rect[1] + offsetXY[1]
-    print("Click on this point (",x, y,")")
-    imouse.position = (x, y)
+    
+    winScale = MonitorScale(x,y)
+    imouse.position = (int(x/winScale), int(y/winScale))
     time.sleep(1)
-    imouse.click(mouse.Button.left, 1)
+
+    if hit_enter and keyboard:
+        print("keyboard.press(keyboardX.Key.enter)")
+        keyboard.press(keyboardX.Key.enter)
+        keyboard.release(keyboardX.Key.enter)
+    else:
+        print("Click on this button point (",x, y,"), offset=(", offsetXY[0],offsetXY[1],")")
+        imouse.click(mouse.Button.left, 1)
 
     time.sleep(5)
     return win32gui.GetForegroundWindow()
@@ -708,15 +774,18 @@ def CapLockStatus(event,e=None):
 
     SeeMe(event,e)
 
-def WindExit():       
+    if event.keycode == 13 and e == WindX['e_EncryptCode']:
+        PSWaction(0,"get")
+
+def WindExit(openNew=0):       
     Clipboard_Empty()
     if WindX['TopLevel']:
         WindX['TopLevel'].destroy()
         WindX['TopLevel'] = None
 
-    WindX['main'].destroy()    
+    WindX['main'].destroy() 
+    WindX['main'] = None
     os._exit(0)
-    #sys.exit(0)  # This will cause the window error: Python has stopped working ...
 
 def SeeMe(event,e=None,ishow=''):
     e.config(show=ishow)
@@ -764,7 +833,7 @@ def ShowHideBasic2_Delay(delaySeconds=30):
         t1 = threading.Timer(delaySeconds,ShowHideBasic2)        
         WindX['ShowHideBasic2_thread_timers'].append(t1)
 
-        if delaySeconds > 1:
+        if delaySeconds >= 1:
             t2 = threading.Timer(0.1,ShowHideBasic2_Delay_countdown)
             WindX['ShowHideBasic2_thread_timers'].append(t2)
             t2.start()
@@ -826,7 +895,7 @@ def ShowHideBasic():
         WindX['win_pos']['orig_width'] = WindX['main'].winfo_width()        
 
     if WindX['ShowHideBasic'] == 1:
-        EnableEntry(wid=WindX['main'], state="disabled", act=1)
+        WinEnableEntry(wid=WindX['main'], state="disabled", act=1)
 
         WindX['ShowHideBasic'] = 0
         WindX['Frame1'].grid_remove()
@@ -852,7 +921,7 @@ def ShowHideBasic():
         WindX['form_widgets_short_display_delay_done'] = 1
         ShowHideBasic2_Delay(10)
     else:
-        EnableEntry(wid=WindX['main'], state="normal", act=1)
+        WinEnableEntry(wid=WindX['main'], state="normal", act=1)
 
         WindX['main'].geometry("")
         ShowHideBasic2(True,1,0)
@@ -862,7 +931,7 @@ def ShowHideBasic():
         WindX['e_HideBase'].config(text="  ∧ ")
         WindX['main'].overrideredirect(0)
 
-def Init(IsInit=1):          
+def Init(IsInit=1): 
     WindX['main'] = Tix.Tk()
     WindX['main'].title("My Wallet")
     WindX['main'].configure(bg='#A0A0A0')
@@ -907,6 +976,11 @@ def Init(IsInit=1):
         WindX['e_delay2send'] = e2
         WindX['winBalloon'].bind_widget(e2, balloonmsg= 'Delay to send, seconds after click')
 
+        xlbl = Label(WindX['Frame1'], text='0', justify=CENTER, relief=FLAT,pady=3,padx=3, bg='#E0E0E0', fg='#A0A0A0')
+        xlbl.grid(row=row,column=10,sticky=E+W,pady=0,padx=1)
+        WindX['e_label_next_rest'] = xlbl
+        WindX['winBalloon'].bind_widget(xlbl, balloonmsg= 'Seconds to get coffee')
+        
     if WindX['Frame2']: 
         row = 0 
         iButton(WindX['Frame2'],row,0,lambda:PSWaction(0,"get"),'Open', width=10) 
@@ -940,6 +1014,12 @@ def Init(IsInit=1):
         WindX['e_warnLabel'] = xlbl
 
     HideConsole()
+    ctypes.windll.shcore.SetProcessDpiAwareness(1)
+    t4 = threading.Timer(1,GetMonitors)
+    t4.start()
+
+    t5 = threading.Timer(2,ReminderCheckMeeting)
+    t5.start()
     mainloop()
 
 def ColumnPadx(col):
@@ -1078,7 +1158,129 @@ class iButton:
         self.b.config(bg = self.bg)
 
 def main():
-    Init()
+    WindX['win_not_sending_key'] = 1
+
+    delaySeconds = 1
+    t1 = threading.Timer(delaySeconds,ForeGroundWindowsCheck)
+    t2 = threading.Timer(delaySeconds,Init)
+    t3 = threading.Timer(delaySeconds,MouseListener)
+    t1.start()  
+    t2.start()
+    t3.start()
+    
+def ReminderCheckMeeting():
+    lastcheck_old = ""
+    tl = None
+    label1 = None
+    sleep_2next = 0
+    lastPopTime = ""
+    interval_refresh = 1 #seconds
+    while True:
+        if not WindX['main']:
+            break
+
+        if sleep_2next > 0:
+            sleep_2next -= interval_refresh
+            try:
+                WindX['e_label_next_rest'].config(text= str(sleep_2next))
+                label1.configure(text=lastPopTime + ", refresh after " + str(sleep_2next) + ' seconds')
+                tl.update()
+            except:
+                pass
+        else:
+            lastPopTime = time.strftime("%Y-%m-%d %H:%M:%S",time.localtime(time.time()))
+            myLocalm = time.localtime() 
+            sleep_2next = (60-myLocalm.tm_min)*60 - myLocalm.tm_sec
+            #print(myLocalm) #time.struct_time(tm_year=2021, tm_mon=6, tm_mday=29, tm_hour=9, tm_min=38, tm_sec=50, tm_wday=1, tm_yday=180, tm_isdst=0)
+            lastcheck = str(myLocalm.tm_year) + "_" + str(myLocalm.tm_mon) + "_" + str(myLocalm.tm_mday) + "_" + str(myLocalm.tm_wday) + "_" + str(myLocalm.tm_hour)
+            if lastcheck != lastcheck_old:
+                lastcheck_old = lastcheck
+                if tl:
+                    tl.destroy()
+
+                tl = Toplevel(bg='black')
+                tl.title("Time to get rest!")
+                tl.wm_attributes('-topmost',1)        
+
+                tl.geometry('+0+0')
+                hwnd = win32gui.FindWindow(None, "Time to get rest!")
+                win32gui.ShowWindow(hwnd, win32con.SW_SHOWMAXIMIZED)
+                tl.overrideredirect(1)
+
+                font_type = tf.Font(size=48)
+                font_type2 = tf.Font(size=20)
+
+                label1 = Label(tl, text= lastPopTime + ", refresh after " + str(sleep_2next) + ' seconds', justify=CENTER, relief=FLAT,pady=10,padx=10, bg='black', fg='white', font=font_type2)
+                label1.pack(side=TOP, fill=X)
+
+                label = Label(tl, text="Time to get coffee,\n\nand check meetings for today!", justify=CENTER, relief=FLAT,pady=10,padx=10, bg='black', fg='white', font=font_type)
+                label.pack(side=TOP, fill=BOTH, expand=True)
+                
+                wh = 200
+                canvas = Canvas(tl,
+                            width=wh,
+                            height=wh,
+                            bg="black",
+                            relief=FLAT,
+                            bd = 0,
+                            )
+                canvas.configure(highlightthickness = 0)
+                canvas.pack(side=TOP) 
+                canvas.bind('<Button-1>',func=handlerAdaptor(ReminderCheckMeetingUIClosed,tl=tl)) 
+                WindX['winBalloon'].bind_widget(canvas, balloonmsg= 'Click to close this window!')
+
+                '''
+                b = Button(tl, 
+                            text="Close", 
+                            relief=FLAT,
+                            padx=5,
+                            pady=5,                    
+                            width=20,
+                            command=lambda:ReminderCheckMeetingUIClosed(tl=tl),
+                            font=font_type2,
+                            bg='#101010', fg='yellow'
+                            )
+
+                b.pack(side=BOTTOM, fill=X)
+                '''
+                t1 = threading.Timer(1,ReminderCheckMeetingUIClosed_delay, args=[tl, canvas, wh])
+                t1.start()
+        #print("ReminderCheckMeeting sleep", interval_refresh, " seconds")
+        time.sleep(interval_refresh)
+
+def ReminderCheckMeetingUIClosed_delay(tl, canvas, wh, delay_sec=60*15):
+    try:
+        delay_sec_o = delay_sec
+        width = 5
+        arc = canvas.create_arc(width,width,wh - width,wh - width,start=0,extent=360,outline='white',style=ARC,width=width)
+        arc2= canvas.create_arc(width*2,width*2,wh - width*2,wh - width*2,start=0,extent=0,outline='green',style=ARC,width=width)
+        txt= canvas.create_text(int(wh/2), int(wh/2), text=str(delay_sec), font=(WindX['WinDefaultFont_configure']['family'], 20), fill='white')
+        ts = 0
+        lastAngle2 = 0
+        while delay_sec > 0:        
+            angle=int(delay_sec/delay_sec_o*3600)/10
+            angle2 = int(ts*360)/10
+            if ts > 10:
+                ts = 0
+                lastAngle2 = 0
+            try:
+                canvas.itemconfig(arc,extent=angle)
+                canvas.itemconfig(arc2,start=lastAngle2,extent=angle2)
+                canvas.itemconfig(txt,text=str(int(delay_sec)))
+                tl.update()
+            except:
+                break
+            lastAngle2 = angle2
+            time.sleep(0.2)
+            delay_sec -= 0.2
+            ts += 0.2
+    except:
+        pass
+
+    ReminderCheckMeetingUIClosed(tl=tl)
+
+def ReminderCheckMeetingUIClosed(event=None, tl=None):
+    tl.destroy()
 
 def ForeGroundWindow():
     try:
@@ -1120,10 +1322,12 @@ def MouseOnClick(x, y, button, pressed):
         ForeGroundWindow()
         #print("mouse click - Foreground Window:", WindX['FGW'])
 
-def MouseOnMove(x, y):
+def MouseOnMove(x, y): 
+    #print(x,y)   
     try:
-        if WindX['TopLevel']: 
-            WindX['TopLevel'].geometry('+'+ str(x) +'+' + str(y + 20))
+        if WindX['TopLevel']:
+            winScale = MonitorScale(x,y)
+            WindX['TopLevel'].geometry('+'+ str(int(x/winScale)) +'+' + str(int(y/winScale) + 20))
     except:
         pass
 
@@ -1133,13 +1337,5 @@ def MouseListener():
 
 
 if __name__ == "__main__": 
-    WindX['win_not_sending_key'] = 1
-
-    delaySeconds = 1
-    t1 = threading.Timer(delaySeconds,ForeGroundWindowsCheck)
-    t2 = threading.Timer(delaySeconds,main)
-    t3 = threading.Timer(delaySeconds,MouseListener)
-    t1.start()  
-    t2.start()
-    t3.start()
+    main()
         
