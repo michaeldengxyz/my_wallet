@@ -1,14 +1,14 @@
-# What it is
+# 1. What it is
 a wallet to save my keys such as ID or passwords, with one encrypt or decrypt code
 
-# Architecture (app constructure)
-## main file: 
+# 2. Architecture (app constructure)
+## Main file: 
 MyWallet.py
 
-## configuration file: 
+## Configuration file: 
 MyWallet.ini.json 
 
-## common subroutines: 
+## Common subroutines: 
 mypyUtils.py 
 mypyUtilsUI.py
 mypyUtilzip.py
@@ -18,7 +18,7 @@ image_ocr_class2.py
 Tab#1 wallet, actions: main UI
 Tab#2 Notes (TBD)
 
-# How to use
+# 3. How to use
 ## Create wallet
 <img src="/MyWallet_How-to-create.png" width=800 />
 
