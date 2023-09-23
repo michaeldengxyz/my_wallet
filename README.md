@@ -13,7 +13,7 @@ a wallet to save my keys such as ID or passwords, with one encrypt or decrypt co
 
 --- UI: <br />
     --- Tab#1 wallet, actions: main UI <br />
-    --- Tab#2 Notes <br />
+    --- Tab#2 Notes (TBD) <br />
 
 # How to use
 ## Create wallet
