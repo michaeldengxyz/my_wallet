@@ -2,6 +2,8 @@
 a wallet to save my keys such as ID or passwords, with one encrypt or decrypt code
 
 # Architecture (app constructure)
+--- main file: MyWallet.py <br />
+
 --- configuration file: <br />
     MyWallet.ini.json <br />
 
