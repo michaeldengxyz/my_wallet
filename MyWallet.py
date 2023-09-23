@@ -1,1123 +1,1502 @@
 #Pyhton 3.x
 # -*- coding: UTF-8 -*-
-# rev.2.0.0.1
+
+
+WindX  = {}
+WindX['app_rev'] = '7.0'
+
+"""
+#required
+pip install pwd
+pip install pywin32
+pip install pynput
+pip install pycryptodome
+pip install screeninfo
+
+#https://blog.csdn.net/luanyongli/article/details/81385284
+#pip install pytesseract 
+
+#https://github.com/paddlepaddle/paddleocr
+#https://github.com/PaddlePaddle/PaddleOCR/blob/develop/doc/doc_ch/installation.md
+pip install paddlepaddle
+pip install Shapely-1.8.2-cp310-cp310-win_amd64.whl
+pip install paddleocr
+
+pip install opencv-python
+pip install pygetwindow
+pip install numpyencoder
+pip install psutil
+pip install numpy==1.23
+pip install ttkwidgets
+"""
 
 import time 
+WindX['load_times'] = []
+WindX['load_times'].append([time.time(), 'app start and load basic modules ...'])
+
 import traceback
 import re
-import os,sys,signal
+import os,sys
+#os.system('cls')
+
+from mypyUtilzip import UZ_Check
+UZ_Check(filename="mypyUtils",   fileExt='py')
+UZ_Check(filename="mypyUtilsUI", fileExt='py')
+
+import mypyUtilsUI
+from mypyUtils import *
+from mypyUtilsUI import *
 
 import win32gui
 import win32api
-import win32con
-import win32com.client
-import win32process
-import win32clipboard
-
+import tkinter as tk
 from tkinter import *
-from tkinter import filedialog,messagebox,tix as Tix
-import tkinter.font as tf
+from tkinter import filedialog,messagebox,ttk
 
 from pynput import mouse
-from pynput.mouse import Listener
+from pynput.mouse import Listener as mouseListener
 from pynput import keyboard as keyboardX
 
 import getpass
-import zlib
-import base64
-import hashlib
-from Crypto.Cipher import AES
 import json
-from ctypes import *
+
 import random, string
 import threading
-import subprocess
-import psutil
-import ctypes
-import numpy
-from screeninfo import get_monitors
+from multiprocessing import Process
 
-WindX  = {}
+from ctypes import *
+
+WindX['load_times'].append([time.time(), 'app load modules: PIL module, ...'])
+from PIL import Image #,ImageDraw,ImageGrab,ImageTk,ImageFont,
+from io import BytesIO
+
+WindX['load_times'].append([time.time(), 'app load modules: paddleocr class ...']) 
+from image_ocr_class2 import PaddleOCR_Class, PaddleOCR_Load
+
+WindX['load_times'].append([time.time(), 'app load modules - end.'])
 WindXX = {}
-WindX['self_folder'] = re.sub(r'\\','/',os.path.abspath(os.path.dirname(__file__)))
-print("\nroot:",WindX['self_folder'])  
-sys.path.append(WindX['self_folder'])  
-os.chdir(WindX['self_folder'])
-WindX['pcName'] = os.environ['COMPUTERNAME']
-print("getcwd:",os.getcwd() + "\nDevice Name:",WindX['pcName'])
+WindX['self_folder'], WindX['pcName'], curUser = UT_GetInfoAppRoot()
 
-WindX['main'] = None
-WindX['LoginID']  = 'dengm'       
-WindX['LoginPSW'] = ''
-WindX['LoginSCD'] = '' 
+WindX['self_folder_log'] = WindX['self_folder'] + '/MyWallet_Log'
+
+#### Global variables
+WindX['ClassWin'] = None
 WindX['EncryptCode'] = ''
-WindX['mainPX'] = 0
-WindX['mainPY'] = 0 
-WindX['ShowHideBasic'] = 1
-WindX['form_rows'] = 0
 WindX['form_widgets'] = {}
 WindX['form_widgets_short'] = {}
-WindX['e_warnLabel'] = None
-WindX['win_pos'] = {'orig_width':0, 'geo_xy':'', 'toolbar_height':0}  
 WindX['mouse_click_points'] = []
-WindX['TopLevel'] = None
-WindX['TopLevel_Label'] = None
-WindX['top_buttons'] = []
-WindX['form_widgets_short_display'] = 1
-WindX['form_widgets_short_display_delay_done'] = 1
-WindX['ShowHideBasic2_thread_timers'] = []
 
+WindX['mouse_click_last_points'] = []
 WindX['display_scale'] = []
+WindX['display_sizes'] = []
+WindX['keys_input_words'] = []
+WindX['win_start'] = 1
 
-def GetMonitors():
-    #return
+WindX['win_ocr_used_time'] = {}
+WindX['win_ocr_PaddleOCR']  = None
+WindX['win_not_sending_key'] = 1
+WindX['keyboard_keyPress'] = []
+WindX['keyboard_keyAltPress'] = False
 
-    i = 0
-    scale = 1
-    for m in get_monitors(): 
-        #m   Monitor(x=0, y=0, width=2560, height=1440, width_mm=700, height_mm=390, name='\\\\.\\DISPLAY1')            
-        i +=1        
-        tl = Toplevel()
-        tl.wm_attributes('-topmost',1) 
-        tl.geometry('+'+ str(m.x) +'+' + str(m.y))
-        label = Label(tl, text="get DPI ...", justify=LEFT, relief=FLAT,pady=3,padx=3, anchor='w')
-        label.pack(side=TOP, fill=X)
-        # Set process DPI awareness
-        try:
-            ctypes.windll.shcore.SetProcessDpiAwareness(1)
-        except:
-            ctypes.windll.user32.SetProcessDPIAware()
-        # Create a tkinter window
-        # Get the reported DPI from the window's HWND
-        dpi = ctypes.windll.user32.GetDpiForWindow(tl.winfo_id())
-        # Print the DPI
-        iscale = int(dpi/96*1000)/1000
-        if iscale > scale:
-            scale = iscale
-        print(".. monitors",i,m,dpi,iscale)        
-        WindX['display_scale'].append([m.x, m.x + m.width, iscale])
-        tl.destroy()
-    
-    if scale > 1:
-        WinDefaultFontSet(scale)
+WindX['row_shortname'] = {}
+WindX['mouse_last_time_click'] = [time.time(),0,0,0]
+WindX['TopLevel_MessageAction'] = None
+WindX['yscrollbar_oWidth'] = 0
+WindX['win_orig_width'] = 0
 
-def MonitorScale(x=0, y=0, needScaled=False):
-    scale = 1
+WindX['configs_file'] = WindX['self_folder'] + "/MyWallet.ini.json"
+WindX['mainPX'] = 0
+WindX['mainPY'] = 0
+WindX['UI_ToplevelAlertClass'] = None
+WindX['FGW'] = {1:[],2:[]}
 
-    if needScaled and len(WindX['display_scale']):
-        for dp in WindX['display_scale']:
-            if x >= dp[0] and x <= dp[1]:
-                scale = dp[2]
-                break
-        print('MonitorScale=',scale)
+#### Configurations settings:
+WindX['win_able_to_AlertSchedule'] = 1
 
-    return scale
+UT_Print2Log('green',"\nconfgiurations:")
+WindX['configs'] = UT_JsonFileRead(filepath=WindX['configs_file'])
+if WindX['configs'] and WindX['configs'].__contains__('configuration'):
+    for cf in sorted(WindX['configs']['configuration'].keys()):
+        UT_Print2Log('green', "\t" + cf, WindX['configs']['configuration'][cf])
+        WindX[cf] = WindX['configs']['configuration'][cf]['value']
+UT_Print2Log('',"")
 
-def WinFocusOn():    
-    if len(WindX['FGW'][1]):
-        try:           
-            l, t, r, b = get_window_rect(WindX['FGW'][1][0])
-            print(".... SetForegroundWindow:",WindX['FGW'][1], l, t, r, b)                    
-            win32gui.SetForegroundWindow(WindX['FGW'][1][0])
-
-            x = l + 2
-            y = t + 2
-            #win32api.mouse_event(win32con.MOUSEEVENTF_MOVE | win32con.MOUSEEVENTF_ABSOLUTE, int(x/SCREEN_WIDTH*65535.0), int(y/SCREEN_HEIGHT*65535.0))
-            win32api.SetCursorPos((x,y))
-            win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN,x,y,0,0)
-            win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP,x,y,0,0)            
-        except:
-            print(traceback.format_exc())
-    else:
-        print(".... Can not catch ForegroundWindow!")
-
-def HideConsole():
+def ConfigurationSave(): 
     try:
-        myfile = re.sub(r'.*(\\|\/)','',sys.argv[0])
-        print("\nfile: ",myfile,"\n")
-        if re.match(r'.*\.py$',myfile,re.I):
-            return
-            
-        whnd = win32gui.FindWindowEx(0,0,'ConsoleWindowClass',None)
-        title  = win32gui.GetWindowText(whnd)
-        print(whnd,title)
-        if title.endswith(myfile) or re.match(r'.*'+ title +'',myfile,re.I):
-            win32gui.ShowWindow(whnd, win32con.SW_HIDE)
-    except:
-        print(traceback.format_exc())
-
-def WinDefaultFontSet(scale):
-    # Creating a Font object of "TkDefaultFont"
-    defaultFont = tf.nametofont("TkDefaultFont")
-    f = defaultFont.configure()
-    print("WinDefaultFont",f) #{'family': 'Segoe UI', 'size': 9, 'weight': 'normal', 'slant': 'roman', 'underline': 0, 'overstrike': 0} 9
-    defaultFont.configure(size= int(f['size']*scale + 0.5))
-
-    WindX['WinDefaultFont_configure'] = f
-
-def WinEnableEntry(wid=None, state="normal", act=1):
-    if not wid:
-        return
-    try:
-        for item in wid.winfo_children():
-            #print("-"*act,item)
-            if re.match(r'.*\!entry\d*$',str(item),re.I):
-                item.configure(state=state)
-
-            if item.winfo_children() :
-                WinEnableEntry(item, state=state, act=act+1)
-    except:
-        pass
-
-def Clipboard_Empty():
-    win32clipboard.OpenClipboard()
-    win32clipboard.EmptyClipboard()
-    win32clipboard.CloseClipboard()
-
-def SendStrViaClipboard(text,delstr=False):
-    try:
-        win32clipboard.OpenClipboard()
-        win32clipboard.EmptyClipboard()
-        win32clipboard.SetClipboardData(win32con.CF_UNICODETEXT, text)
-        win32clipboard.CloseClipboard()
-        #time.sleep(0.1)
-
-        ctr = keyboardX.Controller()
-        if delstr:
-            with ctr.pressed(keyboardX.Key.ctrl,"a"):
-                pass
-            with ctr.pressed(keyboardX.Key.delete):
-                pass
-
-        #print(".. paste text from clipboard:", win32clipboard.GetClipboardData(win32con.CF_UNICODETEXT)) dengmmeDDY#$JABIL22xSHANGHAI218.107.14.4
-        with ctr.pressed(keyboardX.Key.ctrl,"v"):
-            pass   
-    except:
-        win32clipboard.CloseClipboard()
-        print(traceback.format_exc())
-
-def get_window_rect(hwnd):
-    try:
-        f = ctypes.windll.dwmapi.DwmGetWindowAttribute
-    except WindowsError:
-        f = None
-    if f:
-        rect = ctypes.wintypes.RECT()
-        DWMWA_EXTENDED_FRAME_BOUNDS = 9
-        f(ctypes.wintypes.HWND(hwnd),
-          ctypes.wintypes.DWORD(DWMWA_EXTENDED_FRAME_BOUNDS),
-          ctypes.byref(rect),
-          ctypes.sizeof(rect)
-          )
-        return rect.left, rect.top, rect.right, rect.bottom
-
-def Message(msg, bgColor, fgColor):
-    if WindX['TopLevel']:
-        WindX['TopLevel_Label'].config(text=msg,bg=bgColor, fg=fgColor)
-        return
-        #WindX['TopLevel'].destroy()
-
-    WindX['TopLevel'] = Toplevel()
-    WindX['TopLevel'].wm_attributes('-topmost',1)        
-    pos = win32api.GetCursorPos()
-    WindX['TopLevel'].geometry('+'+ str(pos[0]) +'+' + str(pos[1] + 20))
-    WindX['TopLevel'].overrideredirect(1)
-
-    font_type = None 
-    try:
-        font_type = tf.Font(family="Lucida Grande")  #, size=12
-    except:
-        pass
-    label = Label(WindX['TopLevel'], text=msg, justify=LEFT, relief=FLAT,pady=3,padx=3, anchor='w', bg=bgColor, fg=fgColor, font=font_type)
-    label.pack(side=TOP, fill=X)
-    WindX['TopLevel_Label'] = label
-
-def PSWaction(row=0,act=None):
-    #print("psw action",row,act)
-    if WindX['TopLevel']:
-        WindX['TopLevel'].destroy()
-        WindX['TopLevel'] = None
-
-    if WindX['e_warnLabel']:
-        try:
-            WindX['e_warnLabel'].destroy()
-        except:
-            pass
-        WindX['e_warnLabel'] = None
-        
-    if act == "send":
-        #WindX['form_widgets'][row] = [sv_fieldname, sv_value, bdelete.b, ef, ev, bsend.b]
-        #   
-        #                            0             1         2          3   4   5        
-        WindX['main'].title("My Wallet")    
-        if WindX['form_widgets'][row][1].get() == 'LoginCiscoVPN':
-            LoginCiscoVPN()
-            return
-
-        #print("Action ("+act+") - to Foreground Window:", WindX['FGW'])
-        if WindX['FGW'][1][1] == "My Wallet":
-            print(".. You can not input to self main window!")
-            return
-
-        left, top, right, bottom = get_window_rect(WindX['FGW'][1][0])
-        if left + top + right + bottom == 0:
-            print(".. Invalid window -", WindX['FGW'][1])
-            return
-
-        pos = win32api.GetCursorPos()
-        WindX['win_not_sending_key'] = 0
-        t = re.sub(r'[^0-9]+','', WindXX['delay2send'].get())
-        WindX['e_delay2send'].delete(0,"end")
-        if not t:
-            t = 0
-        else:
-            t = int(t)*1
-            if t > 10:
-                t = 10
-        WindX['e_delay2send'].insert(0,str(t))
-        
-        try:
-            if t:               
-                tt = int(t)*10
-                xmsg = " Sending: "+ WindX['form_widgets'][row][0].get() + ", please set foucs where you need to input!"
-                while tt:
-                    #WindX['main'].title("{:>02d}".format(tt) + " Sending: "+ WindX['form_widgets'][row][0].get())
-                    Message("{:>02d}".format(tt) + xmsg, 'yellow', 'red')
-                    WindX['main'].update()
-                    time.sleep(0.1)
-                    tt = tt - 1
-                #WindX['main'].title("Sending ["+ WindX['form_widgets'][row][0].get() +"] now ...")
-                Message(xmsg, 'yellow', 'red')
-            
+        for cf in WindX['configs']['configuration']:
+            if WindX['configs']['configuration'].__contains__(cf):
+                WindX['configs']['configuration'][cf]['value'] = WindX[cf]
             else:
-                n = len(WindX['mouse_click_points'])
-                if n >= 2:
-                    win32gui.SetForegroundWindow(WindX['FGW'][1][0])
-                    
-                    x = WindX['mouse_click_points'][n - 2][0]
-                    y = WindX['mouse_click_points'][n - 2][1]
-                    left, top, right, bottom = get_window_rect(WindX['FGW'][1][0])  #win32gui.GetWindowRect(WindX['FGW'][1][0])
-                    if x >= left and x <= right and y >= top and y <= bottom:
-                        #print(WindX['mouse_click_points'])
+                WindX['configs']['configuration'][cf] = {'value': WindX[cf]}
+
+        UT_JsonFileSave(filepath=WindX['configs_file'], fdata=WindX['configs'])
+    except:
+        UT_Print2Log('red', sys._getframe().f_lineno, traceback.format_exc())
+
+def SaveLog(logFile='', isMainWin=False):    
+    ConfigurationSave()
+    if isMainWin:
+        logFile = WindX['self_folder_log'] + '/MyWalletLog' + time.strftime("%Y%m%d%H%M%S%z",time.localtime(time.time())) + ".html"
+    UT_LogSave2HTML(logFile)
+
+def DisplayLoadTime():
+    WindX['load_times'].append([time.time(), 'UI loaded - end.'])
+    stime = WindX['load_times'][0][0]
+    UT_Print2Log('\n-----------------------------')
+    for s in WindX['load_times']:
+        time_used = UT_UsedTime(0,s[0] - stime)
+        if s[0] == stime:
+            time_used = "00:00:00.000"
+        UT_Print2Log('',time.strftime("%H:%M:%S",time.localtime(s[0])), "+"+time_used, s[1])
+
+def WinFocusOn():
+    if len(WindX['FGW'][1]):
+        UT_Print2Log('', sys._getframe().f_lineno, ".... SetForegroundWindow:",WindX['FGW'][1])
+        UT_WinFocusOn(WindX['FGW'][1][0])
+    else:
+        UT_Print2Log('red', sys._getframe().f_lineno, ".... Can not catch ForegroundWindow!")
+
+def PSWaction(row=0,act=None,filename=None,delstr=False):
+    UT_Print2Log('', "\n",sys._getframe().f_lineno,"psw action", row,act)
+    UI_WinWidgetState(wid=WindX['ClassWin'].root, state="disabled", widName="button")
+    UI_WinWidgetState(wid=WindX['ClassWin'].root, state="disabled", widName="entry")
+
+    try:
+        UT_ClipboardEmpty()
+        if WindX['ClassWin'].label_tmp_status:
+            try:
+                WindX['ClassWin'].label_tmp_status.destroy()
+            except:
+                pass
+            WindX['ClassWin'].label_tmp_status = None
+            
+        if act == "send":
+            #WindX['form_widgets'][row] = [sv_fieldname, sv_value, bdelete.b, ef, ev, bsend.b]
+            #   
+            #                            0             1         2          3   4   5   
+            if WindX['form_widgets'][row][11].get():                
+                ExtensionRun(WindX['form_widgets'][row][1].get())
+                PSWaction_Done()
+                return
+
+            WindX['ClassWin'].root.title("My Wallet " + WindX['app_rev'])    
+            UT_Print2Log('', sys._getframe().f_lineno, "Action ("+act+") - to Foreground Window:", WindX['FGW'])
+            if IsThisAppItself(WindX['FGW'][1][1]):
+                UT_Print2Log('red', sys._getframe().f_lineno, ".. You can not input to self main window!")
+                PSWaction_Done()
+                return
+
+            left, top, right, bottom = UT_WindowRectGet(WindX['FGW'][1][0])
+            if left + top + right + bottom == 0:
+                UT_Print2Log('red', sys._getframe().f_lineno, ".. Invalid window -", WindX['FGW'][1])
+                PSWaction_Done()
+                return
+
+            pos = win32api.GetCursorPos()
+            WindX['win_not_sending_key'] = 0
+            t = re.sub(r'[^0-9]+','', WindX['ClassWin'].var_delay2send.get())
+            WindX['ClassWin'].widget_delay2send.delete(0,"end")
+            if not t:
+                t = 0
+            else:
+                t = int(t)*1
+                if t > 10:
+                    t = 10
+            WindX['ClassWin'].widget_delay2send.insert(0,str(t))
+            
+            try:
+                if t:               
+                    tt = int(t)*10
+                    xmsg = " Sending: "+ WindX['form_widgets'][row][0].get() + ", please set foucs where you need to input!"
+                    while tt:
+                        #WindX['ClassWin'].root.title("{:>02d}".format(tt) + " Sending: "+ WindX['form_widgets'][row][0].get())
+                        UI_ClassToplevelMessage("{:>02d}".format(tt) + xmsg, 'yellow', 'red')
+                        WindX['ClassWin'].root.update()
+                        time.sleep(0.1)
+                        tt = tt - 1
+                    #WindX['ClassWin'].root.title("Sending ["+ WindX['form_widgets'][row][0].get() +"] now ...")
+                    UI_ClassToplevelMessage(xmsg, 'yellow', 'red')
+                
+                else:
+                    n = len(WindX['mouse_click_points'])
+                    if n >= 2:
+                        win32gui.SetForegroundWindow(WindX['FGW'][1][0])
                         
-                        imouse = mouse.Controller()
-                        winScale = MonitorScale(x,y)
-                        print("Click to focus on this point (",x, int(x/winScale),',', y,int(y/winScale), ")", WindX['FGW'][1])
-                        imouse.position = (int(x/winScale), int(y/winScale))    #fit to a 100% of Display Scale, and place the mouse at a correct point
-                        #win32api.SetCursorPos((x,y))
-                        time.sleep(0.2)
-                        imouse.click(mouse.Button.left, 1)
+                        x = WindX['mouse_click_points'][n - 2][0]
+                        y = WindX['mouse_click_points'][n - 2][1]
+                        left, top, right, bottom = UT_WindowRectGet(WindX['FGW'][1][0])  #win32gui.GetWindowRect(WindX['FGW'][1][0])
+                        if x >= left and x <= right and y >= top and y <= bottom:
+                            #UT_Print2Log('', sys._getframe().f_lineno, WindX['mouse_click_points'])
+                            try:
+                                imouse = mouse.Controller()
+                                winScale = UI_DeviceDisplayScale(x,y) 
+                                x1 = int(x/winScale)
+                                y1 = int(y/winScale)                        
+                                imouse.position = (x1, y1)    #fit to a 100% of Display Scale, and place the mouse at a correct point
+                                posx = win32api.GetCursorPos()
+                                UT_Print2Log('', sys._getframe().f_lineno, "Click to focus on this point (",x, x1,',', y, y1, ")",posx, WindX['FGW'][1])
+
+                                if x1 != posx[0] or y1 != posx[1]:                            
+                                    e = win32api.SetCursorPos((x1,y1))   
+                                    if not e:
+                                        UT_Print2Log('red', sys._getframe().f_lineno, "error to win32api.SetCursorPos:",win32api.GetLastError())                         
+                                UT_Print2Log('', sys._getframe().f_lineno)
+                                
+                                time.sleep(0.2)
+                                posx = win32api.GetCursorPos()
+                                if abs(posx[0] - x1) > 5 or abs(posx[1] - y1) > 5:   
+                                    UT_Print2Log('red', sys._getframe().f_lineno, "can not set mouse on the right point: ", (x1, y1),"!!")
+                                    messagebox.showwarning(title='Warning', message="can not set mouse on this right point: (" + str(x1) + ", " + str(y1)+"), now it's here (" + str(posx[0]) + ", " + str(posx[1])+") !!")
+                                    PSWaction_Done()
+                                    return
+                                UT_Print2Log('', sys._getframe().f_lineno)
+
+                                #imouse.click(mouse.Button.left, 1)
+                                UT_Print2Log('', sys._getframe().f_lineno)
+                            except:
+                                UT_Print2Log('red',sys._getframe().f_lineno, traceback.format_exc())
+                        else:
+                            WinFocusOn()
                     else:
                         WinFocusOn()
-                else:
-                    WinFocusOn()
 
+                kstr = str(WindX['form_widgets'][row][1].get())
+                #UT_Print2Log('', sys._getframe().f_lineno, 'send key string:', kstr )
+                UT_Print2Log('', sys._getframe().f_lineno)
+
+                fgwHandle = win32gui.GetForegroundWindow()
+                if fgwHandle and IsThisAppItself(win32gui.GetWindowText(fgwHandle)):
+                    UT_Print2Log('red', sys._getframe().f_lineno, ".. You can not input to self main window!")
+                    messagebox.showwarning(title='Warning', message="You can not input to self main window!!")
+                    PSWaction_Done()
+                    return
+                elif not fgwHandle:
+                    UT_Print2Log('red', sys._getframe().f_lineno, ".. No focus foreground window!")
+                    messagebox.showwarning(title='Warning', message="No focus foreground window!")
+                    PSWaction_Done()
+                    return
+
+                UT_ClipboardPaste(kstr,delstr=delstr)
+                #kb = keyboardX.Controller()
+                #kb.type(kstr)   #please make sure your keyboard with a right language setting
+                UT_Print2Log('', sys._getframe().f_lineno)
+
+                WindX['win_not_sending_key'] = 1
+                WindX['mouse_click_points'] = []
+
+                if not t:
+                    time.sleep(0.2)
+                    win32api.SetCursorPos(pos)
+            except:
+                UT_Print2Log('red',sys._getframe().f_lineno, traceback.format_exc())
+
+        elif act == "copy":
+            if WindX['form_widgets'][row][11].get():
+                UI_WidgetEntryShow(None,e=WindX['form_widgets'][row][6],ishow='')
+
+                UT_Print2Log('blue', sys._getframe().f_lineno, ".. select a file for the extension:", WindX['form_widgets'][row][0].get())
+                filename = filedialog.askopenfilename(
+                                filetypes= [('files', '.*')],
+                                defaultextension='.py',
+                                initialdir= WindX['self_folder'],
+                                title= "Open File"
+                                )
+                if filename:
+                    WindX['form_widgets'][row][1].set(filename)
+                    PSWaction_Done()           
+                return
+    
             kstr = str(WindX['form_widgets'][row][1].get())
-            #print('send key string:', kstr )
+            UT_ClipboardInertText(kstr)
 
-            fgwHandle = win32gui.GetForegroundWindow()
-            if fgwHandle and win32gui.GetWindowText(fgwHandle) == "My Wallet":
-                print(".. You can not input to self main window!")
-                if WindX['TopLevel']:
-                    WindX['TopLevel'].destroy()
-                    WindX['TopLevel'] = None
+        elif act == "delete":
+            #delete the row
+            for i in range(4,len(WindX['form_widgets'][row])):
+                #UT_Print2Log('', WindX['form_widgets'][row][i])
+                try:
+                    WindX['form_widgets'][row][i].grid_remove()
+                except:
+                    pass
+
+            del WindX['form_widgets'][row]
+
+            if WindX['form_widgets_short'].__contains__(row):
+                try:
+                    WindX['form_widgets_short'][row].destroy()
+                except:
+                    pass
+            #UT_Print2Log('', WindX['form_widgets'])
+
+        elif act == "save":
+            if not CodeInputCheck():
+                PSWaction_Done()
                 return
-            elif not fgwHandle:
-                print(".. No focus foreground window!")
-                if WindX['TopLevel']:
-                    WindX['TopLevel'].destroy()
-                    WindX['TopLevel'] = None
-                return
 
-            SendStrViaClipboard(kstr)
-            #kb = keyboardX.Controller()
-            #kb.type(kstr)   #please make sure your keyboard with a right language setting
+            data = {
+                'others'   : ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(2000))
+            }   
 
-            WindX['win_not_sending_key'] = 1
-            WindX['mouse_click_points'] = []
-
-            if not t:
-                time.sleep(0.2)
-                win32api.SetCursorPos(pos)
-        except:
-            print(traceback.format_exc())
-
-    elif act == "delete":
-        #delete the row
-        for i in range(4,len(WindX['form_widgets'][row])):
-            #print(WindX['form_widgets'][row][i])
-            WindX['form_widgets'][row][i].grid_remove()
-
-        del WindX['form_widgets'][row]
-
-        if WindX['form_widgets_short'].__contains__(row):
-            WindX['form_widgets_short'][row].destroy()
-        #print(WindX['form_widgets'])
-
-    elif act == "save":
-        if not InputCheck():
-            return
-
-        data = {
-            'others'   : ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(2000))
-        }   
-
-        n = 0
-        for irow in WindX['form_widgets']:    #[sv_fieldname,sv_value, bdelete.b, ef, ev, bsend.b, sv_fieldnameShort, efs]        
-            if WindX['form_widgets'][irow][0].get() and WindX['form_widgets'][irow][1].get():
-                n +=1
-                short = WindX['form_widgets'][irow][2].get()
-                if not short:
-                    short = WindX['form_widgets'][irow][0].get()
-                
-                data[n] = {
-                    'field_name' : WindX['form_widgets'][irow][0].get(),
-                    'field_value': WindX['form_widgets'][irow][1].get(),
-                    'field_name_short': short,
-                    'ischeck' : WindX['form_widgets'][irow][3].get()
-                }
-        
-        if n:
-            filename = filedialog.asksaveasfilename(
-                filetypes= [('data files', '.dat')], 
-                defaultextension='.dat',
-                initialdir= WindX['self_folder'],
-                title= "Save As",
-                initialfile = "MyWallet." + getpass.getuser() + ".dat"
-                )
-
-            if filename:
-                fdata = CryptMe(json.dumps(data),key=GetMD5(WindX['EncryptCode']), isEncript=True)
-                Save2File(fdata, filename)
-        else:
-            print("No data to save in your wallet!")
-            messagebox.showwarning(title='Warning', message="No data to save in your wallet!")
-
-    elif act == "get":
-        if not InputCheck():
-            return        
-
-        filename = filedialog.askopenfilename(
+            n = 0
+            for irow in WindX['form_widgets']:    #[sv_fieldname,sv_value, bdelete.b, ef, ev, bsend.b, sv_fieldnameShort, efs]        
+                if WindX['form_widgets'][irow][0].get() and WindX['form_widgets'][irow][1].get():
+                    n +=1
+                    short = WindX['form_widgets'][irow][2].get()
+                    if not short:
+                        short = WindX['form_widgets'][irow][0].get()
+                    
+                    data[n] = {
+                        'field_name' : WindX['form_widgets'][irow][0].get(),
+                        'field_value': WindX['form_widgets'][irow][1].get(),
+                        'field_name_short': short,
+                        'ischeck' : WindX['form_widgets'][irow][3].get(),
+                        'ischeck_package': WindX['form_widgets'][irow][11].get()
+                    }
+             
+            if n:
+                filename = filedialog.asksaveasfilename(
                     filetypes= [('data files', '.dat')], 
                     defaultextension='.dat',
                     initialdir= WindX['self_folder'],
-                    title= "Open File"
+                    title= "Save As",
+                    initialfile = "MyWallet." + getpass.getuser() + ".dat"
                     )
-        if filename:
-            try:
-                WindX['win_pos'] = {'orig_width':0, 'geo_xy':'', 'toolbar_height':0}
-                
-                fdata = OpenFile(filename)
-                data  = json.loads(CryptMe(fdata,key=GetMD5(WindX['EncryptCode']), isEncript=False))
 
-                #print(data)
-                if data.__contains__('1'):     
-                    if WindX['Frame3_colnum'] > 1:               
-                        for i in range(3,WindX['Frame3_colnum']+1):
-                            if WindX['form_widgets_short'].__contains__(i):
-                                WindX['form_widgets_short'][i].destroy()
+                if filename:
+                    fdata = UT_CryptMe(json.dumps(data),key=UT_GetMD5(WindX['EncryptCode']), isEncript=True)
+                    UT_FileSave(fdata, filename)
+            else:
+                UT_Print2Log('red', sys._getframe().f_lineno, "No data to save in your wallet!")
+                messagebox.showwarning(title='Warning', message="No data to save in your wallet!")
 
-                    for irow in WindX['form_widgets']:
-                        for i in range(4,len(WindX['form_widgets'][irow])):
-                            #print(WindX['form_widgets'][row][i])
-                            WindX['form_widgets'][irow][i].destroy()
+        elif act == "get":
+            if not CodeInputCheck():
+                PSWaction_Done()
+                return        
+            if not (filename and os.path.exists(filename)):
+                filename = filedialog.askopenfilename(
+                            filetypes= [('data files', '.dat')], 
+                            defaultextension='.dat',
+                            initialdir= WindX['self_folder'],
+                            title= "Open File"
+                            )
+            if filename:
+                try:                   
+                    fdata = UT_FileOpen(filename)
+                    data  = json.loads(UT_CryptMe(fdata,key=UT_GetMD5(WindX['EncryptCode']), isEncript=False))
 
-                    WindX['form_widgets'] = {}
-                    WindX['form_rows'] =1
-                    WindX['form_widgets_short'] = {}
-                    WindX['Frame3_colnum'] = 2                    
+                    #UT_Print2Log('', data)
+                    if data.__contains__('1'):     
+                        if WindX['ClassWin'].form21_colnums > 1:               
+                            for i in range(3,WindX['ClassWin'].form21_colnums+1):
+                                if WindX['form_widgets_short'].__contains__(i):
+                                    try:
+                                        WindX['form_widgets_short'][i].destroy()
+                                    except:
+                                        pass
 
-                    for i in data:
-                        if not i == 'others':
-                            if not data[i].__contains__('field_name_short'):
-                                data[i]['field_name_short'] = ''
-                            if not data[i].__contains__('ischeck'):
-                                data[i]['ischeck'] = 0
+                        for irow in WindX['form_widgets']:
+                            for i in range(4,len(WindX['form_widgets'][irow])):
+                                #UT_Print2Log('', WindX['form_widgets'][row][i])
+                                try:
+                                    WindX['form_widgets'][irow][i].destroy()
+                                except:
+                                    pass
 
-                            UIaddNewRow(WindX['Frame1'], 
-                                        {'field_name' : data[i]['field_name' ],
-                                        'field_value': data[i]['field_value'],
-                                        'field_name_short': data[i]['field_name_short'],
-                                        'ischeck': data[i]['ischeck']
-                                        })
+                        WindX['form_widgets'] = {}
+                        WindX['ClassWin'].form22_rows =1
+                        WindX['form_widgets_short'] = {}
+                        WindX['ClassWin'].form21_colnums = 2
+                        
+                        ToNewRows = []                        
+                        for i in data:
+                            if not i == 'others':
+                                #print(i, data[i])
+                                #data[i]: {'field_name': 'JBL-Windows ID', 'field_value': 'dengm', 'field_name_short': 'JWID', 'ischeck': 0},
+                                if not data[i].__contains__('field_name_short'):
+                                    data[i]['field_name_short'] = ''
+                                if not data[i].__contains__('ischeck'):
+                                    data[i]['ischeck'] = 0
+                                if not data[i].__contains__('ischeck_package'):
+                                    data[i]['ischeck_package'] = 0
+                                
+                                fname = str(data[i]['field_name' ])
+                                ToNewRows.append([fname[0].upper() + fname[1:], data[i]['field_value'], data[i]['field_name_short'], data[i]['ischeck'], data[i]['ischeck_package']])
 
-                else:
-                    print("No data in your wallet!")
-                    messagebox.showwarning(title='Warning', message="No data in your wallet!")
-            except:
-                print(traceback.format_exc())
+                        if len(ToNewRows):
+                            for s in sorted(ToNewRows, key=lambda x:x[0]):
+                                WindX['ClassWin'].UIaddNewRow(WindX['ClassWin'].frame221, 
+                                            {'field_name' : s[0],
+                                             'field_value': s[1],
+                                             'field_name_short': s[2],
+                                             'ischeck': s[3],
+                                             'ischeck_package': s[4]
+                                            })                                
+                            
+                        WindX['win_login_done'] = True
 
-    elif act == 'new':
-        para = {
-            'field_name': 'new field ' + str(WindX['form_rows'] + 1),
-            'field_value': '',
-            'field_name_short': '',
-            'ischeck': 0
-        }
-
-        UIaddNewRow(WindX['Frame1'], para, True)
-
-    elif act == 'Anchor':
-        WinAnchor()
-
-    elif act == 'LoginCiscoVPN':
-        LoginCiscoVPN()
-
-    WindX['main'].title("My Wallet")
-    SeeMe(None,WindX['e_EncryptCode'],'*')
-
-    if WindX['TopLevel']:
-        WindX['TopLevel'].destroy()
-        WindX['TopLevel'] = None
-
-def WinAnchor():
-    #gs = re.split(r'x|\+', WindX['main'].geometry()) #506x152+-1418+224
-    WindX['main'].geometry('+0+0')
-
-def processinfo(processName):
-    pids = psutil.pids()
-    res = False
-    for pid in pids:
-        # print(pid)
-        p = psutil.Process(pid)
-        try:
-            #print(p.name())
-            if str(p.name()).upper() == str(processName).upper():
-                print('--- killing pid ', pid)
-                print(os.popen('taskkill.exe /pid '+str(pid)))
-                res = True  # 如果找到该进程则打印它的PID，返回true
-                break
-        except:
-            pass
-
-    return res  # 没有找到该进程，返回false
-
-def LoginCiscoVPN():
-    print("\nLogin Cisco VPN ...")
-    
-    if not (WindX['LoginPSW'] and WindX['LoginSCD']):
-        return
-
-    hwnd = win32gui.FindWindow(0, 'Cisco AnyConnect Secure Mobility Client')
-    if hwnd:
-        print(hwnd, win32gui.GetWindowText(hwnd),'--- existing!')
-        print("Find and kill vpnui.exe process:", processinfo('vpnui.exe'))
-        #return
-
-    t1 = threading.Timer(1,LoginCiscoVPN_Open)
-    t1.start() 
-
-    isVPNopen = 0
-    hwnd = None
-    while not isVPNopen:
-        hwnd = win32gui.FindWindow(0, 'Cisco AnyConnect Secure Mobility Client')
-        if hwnd:
-            isVPNopen = 1
-        else:
-            print("\t... wait for: Cisco AnyConnect Secure Mobility Client, 3 seconds")
-            time.sleep(3)
-
-    if hwnd:
-        win32gui.SetForegroundWindow(hwnd)
-        time.sleep(1)
-        imouse = mouse.Controller()
-        keyboard = keyboardX.Controller()
-        
-        #Title = Cisco AnyConnect Secure Mobility Client
-        fgwHandle1 = Wind_Input_Submit('Input IP',hwnd,[180, 112+34, 340, 112], imouse,keyboard, '218.107.14.4',hit_enter=True)
-        if fgwHandle1 and (not fgwHandle1 == hwnd) and win32gui.GetWindowText(fgwHandle1)=='Cisco AnyConnect Secure Mobility Client':
-            #Title = Cisco AnyConnect Secure Mobility Client
-            fgwHandle2 = Wind2ClickButton('Confirmed IP 218.107.14.4',fgwHandle1, [250, 288+100],imouse)
-            if fgwHandle2 and (not fgwHandle2 == fgwHandle1) and win32gui.GetWindowText(fgwHandle2)=='Cisco AnyConnect | 218.107.14.4':
-                #Title = Cisco AnyConnect | 218.107.14.4
-                fgwHandle3 = Wind_Input_Submit('Input Password',fgwHandle2,[155, 146+40, 220, 204], imouse,keyboard, WindX['LoginPSW'],hit_enter=True)
-
-                if fgwHandle3 and (not fgwHandle2 == fgwHandle3) and win32gui.GetWindowText(fgwHandle3)=='Cisco AnyConnect | 218.107.14.4':
-                    #Title = Cisco AnyConnect | 218.107.14.4
-                    fgwHandle4 = Wind_Input_Submit('Input Code Option',fgwHandle3,[145, 85+25, 188, 253], imouse,keyboard, '3',hit_enter=True)
-
-                    if fgwHandle4 and (not fgwHandle4 == fgwHandle3) and win32gui.GetWindowText(fgwHandle4)=='Cisco AnyConnect | 218.107.14.4':
-                        #Title = Cisco AnyConnect | 218.107.14.4
-                        fgwHandle5 = Wind_Input_Submit('Input Code value',fgwHandle4,[145, 89+25, 188, 253], imouse,keyboard, WindX['LoginSCD'],hit_enter=True)
-
-                        if fgwHandle5 and (not fgwHandle4 == fgwHandle5) and win32gui.GetWindowText(fgwHandle5)=='Cisco AnyConnect':
-                            #Title = Cisco AnyConnect
-                            Wind2ClickButton('Accept and complete',fgwHandle5, [216, 187],imouse,hit_enter=True,keyboard=keyboard)
-                        else:
-                            print("\n--- Catch wrong window (5 Accept and complete):", win32gui.GetWindowText(fgwHandle5), fgwHandle5, fgwHandle4)
+                        UI_WinFontSet(force=True, mainWin=WindX['ClassWin'].root)
+                        WindX['ClassWin'].root.update()
+                        t4 = threading.Timer(0.5, WindX['ClassWin'].ClassScrollableFrame.canvasLeave)
+                        t4.start()                        
                     else:
-                        print("\n--- Catch wrong window (4 Input Code value):", win32gui.GetWindowText(fgwHandle4), fgwHandle4, fgwHandle3) 
-                else:
-                    print("\n--- Catch wrong window (3 Input Code Option):", win32gui.GetWindowText(fgwHandle3), fgwHandle3, fgwHandle2)
-            else:
-                print("\n--- Catch wrong window (2 Input Password):", win32gui.GetWindowText(fgwHandle2), fgwHandle2, fgwHandle1)
-        else:
-            print("\n--- Catch wrong window (1 Confirmed IP):", win32gui.GetWindowText(fgwHandle1), fgwHandle1, hwnd)
+                        UT_Print2Log('red', "No data in your wallet!")
+                        messagebox.showwarning(title='Warning', message="No data in your wallet!")
+                except:
+                    UT_Print2Log('red', sys._getframe().f_lineno, traceback.format_exc())
 
-def LoginCiscoVPN_Open():    
-    p = subprocess.Popen('C:/Program Files (x86)/Cisco/Cisco AnyConnect Secure Mobility Client/vpnui.exe', shell=True)
+        elif act == 'new':
+            para = {
+                'field_name': 'new field ' + str(WindX['ClassWin'].form22_rows + 1),
+                'field_value': '',
+                'field_name_short': '',
+                'ischeck': 0,
+                'ischeck_package': 0
+            }
 
-def Wind_Input_Submit(todo,hwnd,offsetXY,imouse,keyboard,str_in,hit_enter=False):
-    print("\n" + todo, hwnd,offsetXY,imouse,keyboard,str_in)
-    rect = get_window_rect(hwnd)  #left, top, right, bottom
-    print(hwnd, win32gui.GetWindowText(hwnd), rect)
-    win32gui.SetForegroundWindow(hwnd)
+            WindX['ClassWin'].UIaddNewRow(WindX['ClassWin'].frame221, para, True)
+            UI_WinFontSet(force=True, mainWin=WindX['ClassWin'].root)
+            WindX['ClassWin'].root.update()
+            t4 = threading.Timer(0.5, WindX['ClassWin'].ClassScrollableFrame.canvasLeave)
+            t4.start()
 
-    x = rect[0] + offsetXY[0]
-    y = rect[1] + offsetXY[1]
-    print("Click on this text point (",x, y,"), offset=(", offsetXY[0],offsetXY[1],")")
-    winScale = MonitorScale(x,y)
-    imouse.position = (int(x/winScale), int(y/winScale))
-    time.sleep(1)
-    imouse.click(mouse.Button.left, 1)
-    SendStrViaClipboard(str_in,delstr=True)
-    time.sleep(1)
+        elif act == 'Anchor':
+            UI_WinGeometry(WindX['ClassWin'].root, '+0+0')
 
-    x = rect[0] + offsetXY[2]
-    y = rect[1] + offsetXY[3]    
-    winScale = MonitorScale(x,y)
-    imouse.position = (int(x/winScale), int(y/winScale))
-    time.sleep(1)
+        PSWaction_Done()
+    except:
+        UT_Print2Log('red', sys._getframe().f_lineno, traceback.format_exc())
+        PSWaction_Done()
 
-    if hit_enter:
-        print("keyboard.press(keyboardX.Key.enter)")
-        keyboard.press(keyboardX.Key.enter)
-        keyboard.release(keyboardX.Key.enter)
+def PSWaction_Done():
+    WindX['ClassWin'].root.title("My Wallet " + WindX['app_rev'])
+    UI_WidgetEntryShow(None,WindX['ClassWin'].widget_EncryptCode,'*')
+    UI_WinWidgetState(wid=WindX['ClassWin'].root, state="normal", widName="button")
+    UI_WinWidgetState(wid=WindX['ClassWin'].root, state="normal", widName="entry")
+    WindX['win_not_sending_key'] = 1
+    WindX['mouse_click_points'] = []
+
+def Wind_Align_Browsers(): 
+    ges = re.split(r'\+|x', WindX['ClassWin'].root.geometry())    
+    scale = UI_DeviceDisplayScale(x=int(ges[2]), needScaled=True)
+    UT_Print2Log('','\nmain.geometry()=', WindX['ClassWin'].root.geometry(), ', scale=', scale)
+    UT_WindowsAlign(scale=scale, findWinTitle=r"Microsoft​\s+Edge|Internet\s+Explorer|Google\s+Chrome|SAP\s+Logon")
+
+
+def IsThisAppItself(title):
+    if re.match(r'^My\s+Wallet\s+\d+\.*\d*.*',title,re.I):
+        return True
     else:
-        print("Click on this button point (",x, y,"), offset=(", offsetXY[2],offsetXY[3],")")
-        imouse.click(mouse.Button.left, 1)
-
-    time.sleep(5)
-    return win32gui.GetForegroundWindow()
-
-def Wind2ClickButton(todo,hwnd,offsetXY,imouse,hit_enter=False,keyboard=None):
-    print("\n" + todo)
-
-    rect = get_window_rect(hwnd)  #left, top, right, bottom
-    print(hwnd, win32gui.GetWindowText(hwnd), rect)
-
-    x = rect[0] + offsetXY[0]
-    y = rect[1] + offsetXY[1]
-    
-    winScale = MonitorScale(x,y)
-    imouse.position = (int(x/winScale), int(y/winScale))
-    time.sleep(1)
-
-    if hit_enter and keyboard:
-        print("keyboard.press(keyboardX.Key.enter)")
-        keyboard.press(keyboardX.Key.enter)
-        keyboard.release(keyboardX.Key.enter)
-    else:
-        print("Click on this button point (",x, y,"), offset=(", offsetXY[0],offsetXY[1],")")
-        imouse.click(mouse.Button.left, 1)
-
-    time.sleep(5)
-    return win32gui.GetForegroundWindow()
-
-def FindChildWinds(wxs, hwnd, xhwndChild= None,wantedClass= None, wantedText= None):
-    if not wxs.__contains__(hwnd):
-        wxs[str(hwnd)] = {}
-
-    go = 1
-    c = 0
-    checkedChilds = {}
-    while go:
-        print(c, hwnd, xhwndChild, wantedClass, wantedText)
-        hwndChild = win32gui.FindWindowEx(hwnd, xhwndChild, wantedClass, wantedText)
-        if hwndChild:
-            if not wxs[str(hwnd)].__contains__(str(hwndChild)):
-                print("\t",hwnd, hwndChild, 'Class:[' + str(win32gui.GetClassName(hwndChild)) + ']  Text:['+  str(win32gui.GetWindowText(hwndChild)) + ']',"\n")
-                wxs[str(hwnd)][str(hwndChild)] = {}
-                checkedChilds[hwndChild] = 0
-                c=0
-            else:
-                c +=1
-
-        if c > 8:
-            xhwndChild = None
-            for xch in checkedChilds:
-                if checkedChilds[xch] == 0:
-                    xhwndChild = xch
-                    checkedChilds[xch] = 1
-
-            if not xhwndChild:
-                go = 0
-
-    #for hwndChild in wxs[str(hwnd)]:
-    #    FindChildWinds(wxs[str(hwnd)][hwndChild], hwndChild, None, wantedClass, wantedText)
-
-def OpenFile(filepath):    
-    print("\t.... Open file:",filepath)
-    try:
-        if os.path.exists(filepath):  
-            buffer = b''   
-            with open(filepath,'rb') as f:   
-                buffer = f.read()   
-                f.close()
-
-            return buffer
-    except:
-        print(traceback.format_exc())   
-
-def Save2File(data,filepath):    
-    print("\t.... Save to file:",filepath)
-    try:
-        if os.path.exists(filepath):       
-            os.unlink(filepath) 
-            
-        with open(filepath,'wb+') as f:   
-            f.write(data)   
-    except:
-        print(traceback.format_exc())    
-
-def CryptMe(instring,key=None,isEncript=True):    
-        
-    #fdata['string'] = 'ILOVEU'
-    #fdata['key']    = 'DF11-FB15-B7B2-15AB-47B7-7AC4-C6F9-5EFE'
-    if not len(str(instring)):
-        if isEncript:
-            return b''
-        else:
-            return ''
-
-    fdata = {}
-    unit = "characters"
-    fdata['string'] = instring
-    fdata['size'] = len(fdata['string'])
-    fdata['sizeZ']= 0
-    fdata['rateC']= 'NA'
-    fdata['key'] = key
-    fdata['data'] = ''
-    try:
-        if isEncript:
-            #print("\n\t.. Encrypt ..."); 
-            fdata['data'] = zlib.compress(fdata['string'].encode(encoding='UTF-8',errors='ignore'))       
-            if(fdata['data']):         
-                ckey = re.sub(r'-','',fdata['key']); 
-                #print("\t\tEncrypted:\n\t\t-- KEY: "+ fdata['key']) 
-
-                cryptor = AES.new(ckey.encode('utf-8'),AES.MODE_CBC,str(ckey[0:16]).encode('utf-8'))                       
-                fdata['data'] = base64.b64encode(cryptor.encrypt(pad_text(fdata['data']))); 
-                
-                #print("\t\t-- KEYSIZE: "+str(len(ckey))+"\n\t\t-- BLOCKSIZE: "+str(AES.block_size)+"\n\t\t-- IV: "+ckey[0:16])
-            
-                fdata['sizeZ']= len(fdata['data'])
-                if(fdata['sizeZ']):
-                    fdata['rateC'] = "{:0.2f}".format(fdata['size']/fdata['sizeZ'])
-            else:
-                print("\t.. Failed to compress!\n")        
-            
-            #print("\t.. Compressed: before size="+str(fdata['size'])+" "+unit+", after size="+str(fdata['sizeZ'])+", compressed rate "+str(fdata['rateC'])+"\n") dhkaads
-        else:
-            #print("\n\t.. Decrypt ..."); 
-            ckey = re.sub(r'-','',fdata['key']); 
-            cryptor = AES.new(ckey.encode('utf-8'),AES.MODE_CBC,str(ckey[0:16]).encode('utf-8'))  
-            fdata['data'] = cryptor.decrypt(base64.b64decode(fdata['string'])); 
-            fdata['data'] = zlib.decompress(fdata['data']).decode(encoding='UTF-8',errors='ignore') 
-    except:
-        print(traceback.format_exc()) 
-
-    #print('In: ',instring,'\nout: ',fdata['data'],'\n')
-    return fdata['data']
-
-def pad_text(s):
-    '''Pad an input string according to PKCS#7''' #
-    BS = AES.block_size
-    return s + (BS - len(s) % BS) * chr(BS - len(s) % BS).encode("utf-8")
-
-def GetMD5(instring):
-    return str(hashlib.md5(instring.encode(encoding='UTF-8',errors='strict')).hexdigest()).upper()
-
-def RandomKey(n=1):
-    keys = ''
-    for x in range(n):
-        keyx = ''
-        for i in range(32):
-            keyx += chr(random.randint(32,126))     
-        keys += str(hashlib.md5(keyx.encode(encoding='UTF-8',errors='strict')).hexdigest()).upper()
-    m = 0
-    j = len(keys)
-    key = ''
-    for c in keys:
-        m += 1
-        key += c
-        if (m % 4 == 0) & (m < j):
-            key += '-'  
-    return key
-
-def IsTrue(obj):
-    #print(type(obj),obj)
-    if(type(obj) == numpy.ndarray and obj.any()):
-        return True
-    elif(type(obj) == tuple and len(obj)):
-        return True
-    elif(type(obj) == list and len(obj)):
-        return True
-    elif(type(obj) == dict and len(obj.keys())):
-        return True
-    elif obj:
-        return True    
-    else: 
         return False
 
-def CapLockStatus(event,e=None): 
-    #print(event,':',e)   
-    if win32api.GetKeyState(win32con.VK_CAPITAL) == 1:
-        #print ("CAPS Lock is on.") 
-        if e:
-            e.configure(background='#FFFF66')
-        
-    elif win32api.GetKeyState(win32con.VK_CAPITAL) == 0:
-        #print ("CAPS Lock is off.")
-        if e:
-            e.configure(background='#FFFFFF')
+def KeyInputCheck(event,e=None):
+    #UT_Print2Log('', event,':',e)   
+    UI_CapLockStatus(event, e=e)
+    UI_WidgetEntryShow(event,e)
 
-    SeeMe(event,e)
+    if event.keycode == 13 and e == WindX['ClassWin'].widget_EncryptCode:
+        filename = WindX['self_folder'] + "/MyWallet." + getpass.getuser() + ".dat"
+        if not os.path.exists(filename) and os.path.exists(WindX['self_folder'] + "/MyWallet.DengM.dat"):
+            filename = WindX['self_folder'] + "/MyWallet.DengM.dat"
 
-    if event.keycode == 13 and e == WindX['e_EncryptCode']:
-        PSWaction(0,"get")
+        PSWaction(0,"get", filename=filename)
 
-def WindExit(openNew=0):       
-    Clipboard_Empty()
-    if WindX['TopLevel']:
-        WindX['TopLevel'].destroy()
-        WindX['TopLevel'] = None
-
-    WindX['main'].destroy() 
-    WindX['main'] = None
-    os._exit(0)
-
-def SeeMe(event,e=None,ishow=''):
-    e.config(show=ishow)
-    return
-
-def handlerAdaptor(fun,**kwds):
-    return lambda event,fun=fun,kwds=kwds:fun(event,**kwds) 
-
-def DefTmp():
-    return None
-
-def InputCheck():    
+def CodeInputCheck():
     yes = 1
     try:
-        WindX['EncryptCode'] = WindXX['EncryptCode'].get()       
+        WindX['EncryptCode'] = WindX['ClassWin'].var_EncryptCode.get()       
         if not WindX['EncryptCode']:
             yes = 0
-            print('Please input: Encrypt / Decrypt Code!')
+            WindX['ClassWin'].widget_EncryptCode.configure(background='#FFFF66')
+            UT_Print2Log('red', sys._getframe().f_lineno, 'Please input: Encrypt / Decrypt Code!')
             messagebox.showwarning(title='Warning', message='Please input: Encrypt / Decrypt Code!')
+        else:
+            WindX['ClassWin'].widget_EncryptCode.configure(background='#FFFFFF')
     except:
         pass
         
     return yes   
 
-def ShowHideBasic2_Delay_countdown(t=30):
-    while t > 0 and WindX['form_widgets_short_display_delay_done'] == 0 and WindX['ShowHideBasic'] == 0:
-        WindX['e_HideToolbar'].config(text=" < : " + str(t) + " ")
-        WindX['main'].update()
-        t -= 1
-        time.sleep(1)
+def DeviceDisplaysInfo():
+    #return
+    WindX['load_times'].append([time.time(), 'Get monitors: ...'])
+    
+    info = UI_DeviceDisplayInfoGet()
+    WindX['display_scale'] = info['display_scale']
+    WindX['display_sizes'] = info['display_sizes']
+    mrect = [1000000, 1000000, -100, -100]
+    for m in WindX['display_sizes']: 
+        #m   Monitor(x=0, y=0, width=2560, height=1440, width_mm=700, height_mm=390, name='\\\\.\\DISPLAY1') 
+        if m.x < mrect[0]:
+            mrect[0] = m.x
+        if m.y < mrect[1]:
+            mrect[1] = m.y
+        if m.x + m.width > mrect[2]:
+            mrect[2] = m.x + m.width
+        if m.y + m.height > mrect[3]:
+            mrect[3] = m.y + m.height
+            
+    UT_Print2Log('', "ClipCursor=",mrect)
+    sys.stdout.flush()
+    try:
+        win32api.ClipCursor(mrect)
+        UI_WinFontSet(mainWin=WindX['ClassWin'].root)
+        win32gui.SetForegroundWindow(WindX['ClassWin'].root.winfo_id())
+    except:
+        pass
 
-    WindX['e_HideToolbar'].config(text="  < ")
+    if not WindX['win_orig_width']:
+        WindX['ClassWin'].root.update()
+        WindX['win_orig_width'] = WindX['ClassWin'].root.winfo_width() 
+    print("WindX['win_orig_width']=", WindX['win_orig_width'])
 
-def ShowHideBasic2_Delay(delaySeconds=30):
-    if WindX['form_widgets_short_display_delay_done']:
-        WindX['form_widgets_short_display_delay_done'] = 0
-        if len(WindX['ShowHideBasic2_thread_timers']):
-            for t in WindX['ShowHideBasic2_thread_timers']:
+    t5 = threading.Timer(2,AlertSchedule)
+    t5.start()
+
+    WindX['ClassWin'].ClassScrollableFrame.canvasLeave(fixSide='width')
+    DisplayLoadTime()
+
+def GUI_Init(): 
+    WindX['win_login_done'] = False 
+    WindX['load_times'].append([time.time(), 'UI loading: ...'])
+
+    WindX['ClassWin'] = ClassWinTkBase()
+    UT_Print2Log('','ClassWinTkBase=', WindX['ClassWin'])
+
+    WindX['ClassWin'].root.update()
+    if not WindX['yscrollbar_oWidth']:
+        try:
+            rect = win32gui.GetWindowRect(WindX['ClassWin'].ClassScrollableFrame.scrollbar_y.winfo_id())  #Frame2.scrollbar_y left top right bottom (522, 78, 539, 382)
+            WindX['yscrollbar_oWidth'] = abs(rect[2] - rect[0])
+        except:
+            UT_Print2Log('red', sys._getframe().f_lineno, traceback.format_exc())
+
+    UI_ToplevelRect([100, 15], [0,0])
+    UI_ToplevelRectHide()
+
+    UT_HideConsoleWindow(myfile= sys.argv[0])    
+    t4 = threading.Timer(1, DeviceDisplaysInfo)
+    t4.start()
+    #AlertSchedule()
+    WindX['ClassWin'].root.mainloop()
+
+def ExtensionRun(filepath):
+    if not os.path.exists(filepath):
+        UT_Print2Log('red', sys._getframe().f_lineno, "!! The extension file is not exsting:", filepath)
+        return
+    
+    UT_Print2Log('blue', sys._getframe().f_lineno, ".. Executing the extension: [" + filepath + "]")
+
+    try:
+        cmd = "\"" + filepath + "\""
+        p = Process(target=UT_ProcessNew,args=[cmd])
+        p.start()
+        #new process target - UT_ProcessNew must be imported from other module!!! 
+        #or will get - AttributeError: Can't get attribute 'long_time_task' on <module '__main__' (built-in)>
+    except:
+        UT_Print2Log('red', sys._getframe().f_lineno, traceback.format_exc())
+
+def ExtensionCheck(row=0):
+    if WindX['form_widgets'].__contains__(row):
+        try:        
+            if WindX['form_widgets'][row][11].get():
+                UI_WidgetEntryShow(None,e=WindX['form_widgets'][row][6],ishow='')
+
+                WindX['form_widgets'][row][7].configure(text='Go')   #Send button
+                WindX['form_widgets'][row][14].config(text='Execute this extension')
+
+                WindX['form_widgets'][row][10].configure(text='Select File')  #copy button
+                WindX['form_widgets'][row][13].config(text='Select an extension file')
+
+                extfile = WindX['form_widgets'][row][1].get()
+                isValid = True
+                if extfile:
+                    extdir  = os.path.dirname(extfile)
+                    print("ExtensionCheck: row=", row, WindX['form_widgets'][row][11].get(), '\n\tFilepath:', extfile, '\n\tFile Dir:', extdir)
+                    if not extdir:
+                        extfile = WindX['self_folder'] + '/' + extfile
+
+                    if not os.path.exists(extfile):
+                        isValid = False
+                else:
+                    isValid = False
+                    
+                if not isValid:
+                    UT_Print2Log('red', sys._getframe().f_lineno, "please input a valid file path into [field value]!")
+                    messagebox.showwarning(title='Warning', message="The extension file is invalid: ["+ WindX['form_widgets'][row][1].get() +"]\n\nPlease input a valid file path into [field value]!")
+
+            else:
+                WindX['form_widgets'][row][7].configure(text='Send')   #Send button
+                WindX['form_widgets'][row][14].config(text='Send field value of ' + WindX['form_widgets'][row][0].get())
+
+                WindX['form_widgets'][row][10].configure(text='Copy')  #copy button
+                WindX['form_widgets'][row][13].config(text='Copy field value of ' + WindX['form_widgets'][row][0].get())
+
+        except:
+            UT_Print2Log('red', sys._getframe().f_lineno, traceback.format_exc()) 
+
+def AlertSchedule():
+    if not WindX['win_able_to_AlertSchedule']:
+        return
+    AlertScheduleEnd()
+
+    WindX['UI_ToplevelAlertClass'] = UI_ClassToplevelAlertOnFullScreen(
+        mainWin      = WindX['ClassWin'].root, 
+        mainWin_start= WindX['win_start'], 
+        e_display    = WindX['ClassWin'].widget_label_next_rest,
+        alert        = "Time to get coffee,\n\nand check meetings for today!",
+        interval     = 15
+    )
+    t5 = threading.Timer(0.01,WindX['UI_ToplevelAlertClass'].run)
+    t5.start()
+
+    WindX['win_start'] = 0
+
+def AlertScheduleEnd():
+    if WindX['UI_ToplevelAlertClass']:
+        try:
+            WindX['UI_ToplevelAlertClass'].tl.destroy()
+        except:
+            pass    
+
+def ForeGroundWindow():
+    try:
+        fgwHandle = win32gui.GetForegroundWindow()
+        if fgwHandle and WindX['win_not_sending_key']:
+            title = win32gui.GetWindowText(fgwHandle)
+            if IsThisAppItself(title):
+                if mypyUtilsUI.WinUtilsUI['Win_last_geometry']:
+                    UI_WinFontSet(mainWin=WindX['ClassWin'].root)
+                return
+            WindX['FGW'][1] = [fgwHandle, title]
+
+            '''
+            if len(WindX['FGW'][1]) == 0:
+                WindX['FGW'][1] = [fgwHandle, win32gui.GetWindowText(fgwHandle)]
+                #UT_Print2Log('', "FGW", WindX['FGW'])
+
+            elif len(WindX['FGW'][2]) == 0:
+                WindX['FGW'][2] = [fgwHandle, win32gui.GetWindowText(fgwHandle)]
+                #UT_Print2Log('', "FGW", WindX['FGW'])
+
+            elif not (fgwHandle == WindX['FGW'][2][0]):
+                WindX['FGW'][1] = WindX['FGW'][2]
+                WindX['FGW'][2] = [fgwHandle, win32gui.GetWindowText(fgwHandle)]
+                #UT_Print2Log('', "FGW", WindX['FGW'])
+            '''
+    except:
+        UT_Print2Log('red', sys._getframe().f_lineno, traceback.format_exc()) 
+
+def ForeGroundWindowsCheck():
+    while True:
+        ForeGroundWindow()
+        time.sleep(0.1)
+
+class ClassWinTkBase():
+    def __init__(self, mainPX=0, mainPY=0, revision=WindX['app_rev'], collapse_color = 'red'):
+        self.collapse_color = collapse_color
+        if not self.collapse_color:
+            self.collapse_color= 'red'
+        
+        self.root = None
+        self.root_x0 = mainPX
+        self.root_y0 = mainPY
+        self.revision = revision
+        self.Frame2HideCountdownTimer_timers = []
+        self.Frame2HideCountdown_count = 0
+        self.Frame22Show_Yes = True
+        self.Frame2Hide_Yes  = False
+
+        self.label_tmp_status = None
+        self.form22_rows = 0
+        self.form21_colnums = 1
+
+        self.UI()
+
+    def UI(self):
+        try:
+            self.root = tk.Tk()
+        except:
+            UT_Print2Log('red', sys._getframe().f_lineno, traceback.format_exc())
+            self.WindExit()
+
+        self.root.title("My Wallet " + self.revision)
+        self.root.configure(bg='#A0A0A0')
+        self.root.geometry('+' + str(self.root_x0) + '+' + str(self.root_y0))
+        self.root.wm_attributes('-topmost',1) 
+        #self.root.overrideredirect(1)
+        self.root.protocol("WM_DELETE_WINDOW", self.WindExit)
+        self.root.bind('<Motion>', self.WinOnMotion)
+
+        self.root.grid_columnconfigure(0, weight=1)
+        self.root.grid_rowconfigure(1, weight=1)
+
+        self.frame1 = Frame(self.root, width=120, height=3, bg= self.collapse_color)
+        self.frame1.grid(row=0,column=0,sticky=E+W+S+N,pady=0,padx=0)
+        self.frame1.bind('<Motion>', self.MotionFrame1)
+
+        self.frame2 = Frame(self.root,bg='#E0E0E0')
+        self.frame2.grid(row=1,column=0,sticky=E+W+S+N,pady=0,padx=0)
+        self.frame2.grid_columnconfigure(0, weight=1)
+        self.frame2.grid_rowconfigure(1, weight=1)
+
+        self.frame21 = Frame(self.frame2,bg='#E0E0E0')
+        self.frame21.grid(row=0,column=0,sticky=E+W+S+N,pady=0,padx=0)
+
+        self.frame22 = Frame(self.frame2,bg='#E0E0E0')
+        self.frame22.grid(row=1,column=0,sticky=E+W+S+N,pady=0,padx=0)  
+        self.frame22.grid_columnconfigure(0, weight=1)
+
+        self.frame221x = Frame(self.frame22,bg='#E0E0E0')
+        self.frame221x.grid(row=0,column=0,sticky=E+W+S+N,pady=0,padx=0)
+
+        self.frame2211_bg = '#E8E8E8'
+        self.frame2211 = Frame(self.frame221x,bg=self.frame2211_bg)
+        self.frame2211.grid(row=0,column=0,sticky=E+W+S+N,pady=1,padx=0)
+
+        self.ClassScrollableFrame = ClassScrollableFrame(self.frame221x)   #WindX['Frame1X']
+        self.frame221 = self.ClassScrollableFrame.scrollable_frame         #WindX['Frame1']
+        self.ClassScrollableFrame.grid(row=1,column=0,sticky=E+W+S+N,pady=0,padx=0)
+        self.root.bind("<MouseWheel>",  self.ClassScrollableFrame.canvasMouseWheel)
+
+        self.frame222 = Frame(self.frame22,bg='#E0E0E0')
+        self.frame222.grid(row=1,column=0,sticky=E+W+S+N,pady=0,padx=0)
+
+        #- root
+        #-- frame1
+        #-- frame2
+        #------ frame21: ⇡ ∧ (quick buttons)
+        #------ frame22: 
+        #--------- frame221x: 
+        #------------- frame2211: Encrypt / Decrypt Code, 
+        #------------- frame221 : data list
+        #--------- frame222: Open, Save, New, Anchor, Auto
+
+        if self.frame21:
+            b=ClassButtonGrid(self.frame21,0,0, self.Frame2Hide,'⇡',msg='Collapse Window', width=4)
+            self.frame21_buttonCollapseWindow = b.b
+
+            self.frame21_buttonShowFrame22Text = '  ∧  '
+            b = ClassButtonGrid(self.frame21,0,1,self.Frame22Show, self.frame21_buttonShowFrame22Text, width=4)
+            self.frame21_buttonShowFrame = b.b
+
+            xlbl = Label(self.frame21, text='please input [Code], then hit [Enter] key to load your data ...', justify=CENTER, relief=FLAT,pady=3,padx=3, bg='yellow')
+            xlbl.grid(row=0,column=0,columnspan=3, sticky=E+W)
+            self.label_tmp_status = xlbl
+
+            bs = ClassButtonGrid(self.frame21,0,1000,Wind_Align_Browsers,'A.B',p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',0,E+W+N+S,1,1])
+            UI_WidgetBalloon(bs.b,  'Align browser windows')
+
+        if self.frame2211:
+            row = 0  
+            col = 0
+            Label(self.frame2211, text='Code', justify=CENTER, relief=FLAT,pady=5,padx=5, bg=self.frame2211_bg).grid(row=row,column=col,sticky=E+W)
+            self.var_EncryptCode = StringVar()
+            
+            col+=1
+            e=Entry(self.frame2211, justify=LEFT, relief=FLAT, textvariable=self.var_EncryptCode, show="*")
+            e.grid(row=row,column=col,sticky=E+W+N+S,pady=1,padx=1)
+            e.insert(0,WindX['EncryptCode'])
+            e.bind('<FocusIn>',func=UT_HandlerAdaptor(KeyInputCheck,e=e))
+            e.bind('<KeyRelease>',func=UT_HandlerAdaptor(KeyInputCheck,e=e))
+            e.bind('<Leave>',func=UT_HandlerAdaptor(UI_WidgetEntryShow,e=e,ishow='*'))
+            e.focus()
+            self.widget_EncryptCode = e
+            UI_WidgetBalloon(e,  'Code to encrypt or decrypt your data')
+
+            col+=1
+            Label(self.frame2211, text='Delay', justify=CENTER, relief=FLAT,pady=5,padx=5, bg=self.frame2211_bg).grid(row=row,column=col,sticky=E+W)
+            
+            col+=1
+            self.var_delay2send = StringVar()
+            e2=Entry(self.frame2211, justify=CENTER, relief=FLAT, textvariable= self.var_delay2send, width=6)
+            e2.grid(row=row,column=col,sticky=E+W+N+S,pady=1,padx=0)
+            e2.insert(0,0)
+            self.widget_delay2send = e2
+            UI_WidgetBalloon(e2,  'Delay to send, seconds after click')
+
+            col+=1
+            self.frame2211.grid_columnconfigure(col, weight=1)
+            xlbl = Label(self.frame2211, text='0', justify=RIGHT, relief=FLAT,pady=5,padx=3, bg=self.frame2211_bg, fg='#A0A0A0', anchor=E)
+            xlbl.grid(row=row,column=col,sticky=E+W,pady=1,padx=5)
+            self.widget_label_next_rest = xlbl
+            UI_WidgetBalloon(xlbl,  'Seconds to have a break')
+
+        if self.frame222:
+            row = 0 
+            col = 0
+            ClassButtonGrid(self.frame222,row,col,lambda:PSWaction(0,"get"),'Open', width=10)
+            
+            col+=1
+            ClassButtonGrid(self.frame222,row,col,lambda:PSWaction(0,"save"),'Save', width=10)    
+
+            col+=1
+            b = ClassButtonGrid(self.frame222,row,col,lambda:PSWaction(0,"new"),'New', width=10)  
+            UI_WidgetBalloon(b.b,  'Add new row')
+
+            col+=1
+            b = ClassButtonGrid(self.frame222,row,col,lambda:PSWaction(0,"Anchor"),'⇱', width=10)  
+            UI_WidgetBalloon(b.b,  'Anchor at the point (0,0)')
+
+            col+=1
+            self.var_Click_Watcher = IntVar()
+            ef_chkb = Checkbutton(self.frame222, text= "Auto", variable= self.var_Click_Watcher, justify=LEFT, fg='blue', bg='#E0E0E0', relief=FLAT, width=10)
+            ef_chkb.grid(row=row,column=col,sticky=E+W+N+S,padx=0,pady=0)
+            UI_WidgetBalloon(ef_chkb,  '-- Auto check (and show OCR result) on the click-area.\n-- While pressing [Alt] key then copy OCR result to clipboard.\n-- Click middle-mouse to trigger this watcher once.', 'Mouse-click Watcher')
+            #self.var_Click_Watcher.set(1)         
+
+        #self.root.mainloop()
+
+    def WinOnMotion(self, event=None):
+        self.WinOnMotion_LastTime = time.time()
+        self.Frame2HideCountdown_count = 30
+
+    def StickOnTopSide(self):
+        geos = re.split(r'\D', self.root.geometry(),re.I)
+        gx = re.split(r'\+',geos[2])
+        self.geo_xy = str(gx[0]) + '+0'
+        self.root.geometry('+' + self.geo_xy)
+
+    def Frame2Hide(self, event=None):
+        self.root.geometry("")
+        self.frame2.grid_remove()
+        self.Frame2Hide_Yes = True
+        self.StickOnTopSide()
+        self.root.overrideredirect(1)
+        self.Frame22Show(force2hide=True)
+
+    def MotionFrame1(self, event=None):
+        if not self.Frame22Show_Yes:
+            self.root.geometry("")
+            self.frame2.grid()        
+            self.Frame2Hide_Yes  = False
+            self.WinOnMotion()
+            self.Frame22Show(force2hide=True)
+            self.Frame2HideCountdownTimer()
+
+    def Frame2HideCountdown(self, t=30):
+        self.Frame2HideCountdown_count = t
+        while self.Frame2HideCountdown_count > 0 and (not self.Frame2Hide_Yes) and (not self.Frame22Show_Yes):            
+            self.frame21_buttonCollapseWindow.config(text='⇡ ' + str(self.Frame2HideCountdown_count))
+            self.root.update()
+            self.Frame2HideCountdown_count -= 1
+            time.sleep(1)
+
+        if not self.Frame2Hide_Yes:
+            if self.WinOnMotion_LastTime and time.time() - self.WinOnMotion_LastTime > 30:
+                self.Frame2Hide()
+            elif not self.Frame22Show_Yes:
+                if not self.Frame2HideCountdown_count:
+                    self.Frame2Hide()
+                else:
+                    self.Frame2HideCountdown()
+
+        self.frame21_buttonCollapseWindow.config(text='⇡')
+
+    def Frame2HideCountdownTimer(self):
+        if len(self.Frame2HideCountdownTimer_timers):
+            for t in self.Frame2HideCountdownTimer_timers:
                 try:
                     t.cancel()
                 except:
-                    print(traceback.format_exc()) 
-        WindX['ShowHideBasic2_thread_timers'] = []
+                    UT_Print2Log('red', sys._getframe().f_lineno, traceback.format_exc())
+        self.Frame2HideCountdownTimer_timers = []
 
-        t1 = threading.Timer(delaySeconds,ShowHideBasic2)        
-        WindX['ShowHideBasic2_thread_timers'].append(t1)
+        t1 = threading.Timer(0.01, self.Frame2HideCountdown)
+        t1.start()
+        self.Frame2HideCountdownTimer_timers.append(t1)
 
-        if delaySeconds >= 1:
-            t2 = threading.Timer(0.1,ShowHideBasic2_Delay_countdown)
-            WindX['ShowHideBasic2_thread_timers'].append(t2)
-            t2.start()
+    def Frame22Show(self, event=None, force2hide=False):
+        self.root.geometry("")
+        if self.Frame22Show_Yes or force2hide:
+            UI_WinWidgetState(wid=self.root, state="disabled", widName="entry")
+            self.Frame22Show_Yes = False
+            self.frame22.grid_remove()    
+            self.frame21_buttonShowFrame22Text = "  ∨ "
+            self.root.overrideredirect(1)
+            if not force2hide:
+                self.Frame2HideCountdownTimer()
+        else:
+            UI_WinWidgetState(wid=self.root, state="normal", widName="entry")
+            self.Frame22Show_Yes = True
+            self.frame22.grid()
+            self.frame21_buttonShowFrame22Text = '  ∧  '
+            self.root.overrideredirect(0)
 
-        t1.start()         
+        self.frame21_buttonShowFrame.configure(text= self.frame21_buttonShowFrame22Text)
 
-def ShowHideBasic2X():
-    WindX['form_widgets_short_display_delay_done'] = 1
-    ShowHideBasic2_Delay(0.1)
+    def ColumnPadx(self, col):
+        if col % 2:
+            return 1
+        else:
+            return 0
 
-def ShowHideBasic2(display=False, isForce=False, isDelay=1):
-    if WindX['ShowHideBasic']:
-        if isDelay:
-            WindX['form_widgets_short_display_delay_done'] = 1
-        return
+    def UIaddNewRow(self, form, para,addNew=None):
+        self.form22_rows +=1
+        row = self.form22_rows
+        col = 0
+        pady_row = 0
+        if self.form22_rows % 2:
+            pady_row = 1
+        
+        ef_chkbx = ClassCheckboxGrid(
+            form,self.form22_rows, col, None, self.form22_rows - 1,
+            fg='#009900',
+            bg='#EFEFEF', 
+            p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',0,E+W+N+S,pady_row, self.ColumnPadx(col)], 
+            isList=True,
+            msg = 'Checked to show on the toolbar',
+            ischeck= para['ischeck']                          
+        )
+        sv_ischeck = ef_chkbx.variable
+        ef_chkb    = ef_chkbx.b 
 
-    #print("ShowHideBasic2, display=", display)
-    if len(WindX['form_widgets_short']):
-        for col in WindX['form_widgets_short']:
+        col +=1
+        sv_fieldname = StringVar()
+        ef=Entry(form, justify=LEFT, relief=FLAT, textvariable= sv_fieldname, width=25)
+        ef.grid(row=self.form22_rows,column=col,sticky=E+W+N+S,padx=self.ColumnPadx(col),pady=pady_row)
+        ef.insert(0,para['field_name'])
+        ef.bind('<FocusIn>',func=UT_HandlerAdaptor(KeyInputCheck,e=ef))
+        ef.bind('<KeyRelease>',func=UT_HandlerAdaptor(KeyInputCheck,e=ef))
+        ef.bind('<Motion>',func=UT_HandlerAdaptor(self.UI_highlight_row, row=row,act=1))
+        ef.bind('<Leave>', func=UT_HandlerAdaptor(self.UI_highlight_row, row=row,act=0))
+        if addNew:
+            ef.focus()
+        UI_WidgetBalloon(ef,  'Field Name')
+
+        col +=1
+        sv_fieldnameShort = StringVar()
+        efs=Entry(form, justify=LEFT, relief=FLAT, textvariable= sv_fieldnameShort,width=8)
+        efs.grid(row=self.form22_rows,column=col,sticky=E+W+N+S,padx=self.ColumnPadx(col),pady=pady_row)
+        efs.insert(0,para['field_name_short'])
+        efs.bind('<FocusIn>',func=UT_HandlerAdaptor(KeyInputCheck,e=ef))
+        efs.bind('<KeyRelease>',func=UT_HandlerAdaptor(KeyInputCheck,e=ef))
+        efs.bind('<Motion>',func=UT_HandlerAdaptor(self.UI_highlight_row, row=row,act=1))
+        efs.bind('<Leave>', func=UT_HandlerAdaptor(self.UI_highlight_row, row=row,act=0))
+
+        UI_WidgetBalloon(efs,  'Short Field Name')
+        
+        if para['field_name_short'] == 'JWID' or para['field_name_short'] == 'JPSW' or para['field_name_short'] == 'JCOD':
+            WindX['row_shortname'][para['field_name_short']] = row
+
+        col +=1
+        sv_value = StringVar()
+        ev=Entry(form, justify=LEFT, relief=FLAT, textvariable= sv_value, show="*", width=22)
+        ev.grid(row=self.form22_rows,column=col,sticky=E+W+N+S,padx=self.ColumnPadx(col),pady=pady_row)
+        ev.insert(0,para['field_value'])
+        ev.bind('<FocusIn>',func=UT_HandlerAdaptor(KeyInputCheck,e=ev))
+        ev.bind('<KeyRelease>',func=UT_HandlerAdaptor(KeyInputCheck,e=ev))
+        ev.bind('<Leave>',func=UT_HandlerAdaptor(UI_WidgetEntryShow,e=ev,ishow='*'))  
+        UI_WidgetBalloon(ev,  'Field Value')
+
+        col +=1
+        ef_chkb_ext = ClassCheckboxGrid(
+            form,self.form22_rows, col, lambda:ExtensionCheck(row), '',
+            bg='#EFEFEF', 
+            p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',0,E+W+N+S,pady_row,self.ColumnPadx(col)], 
+            isList=True,
+            msg = 'Checked to be executed as an extension',
+            ischeck= para['ischeck_package']                            
+        )
+        sv_ischeck_extension = ef_chkb_ext.variable
+        ef_chkb_extension    = ef_chkb_ext.b
+
+        texttips = {
+            'copy':['Copy', 'Copy field value of ' + para['field_name']],
+            'send':['Send', 'Send field value of ' + para['field_name']]
+        }
+        if para['ischeck_package']:
+            texttips = {
+                'copy':['Select File', 'Select an extension file'],
+                'send':['Go', 'Execute this extension']
+            }
+
+        col +=1
+        bcopy = ClassButtonGrid(
+            form,self.form22_rows, col, lambda:PSWaction(row,"copy"),texttips['copy'][0], 
+            bg='#EFEFEF', 
+            p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',8,E+W+N+S,pady_row,self.ColumnPadx(col)], 
+            isList=True,
+            msg = texttips['copy'][1]
+            )
+
+        col +=1
+        bsend = ClassButtonGrid(
+            form,self.form22_rows,col,lambda:PSWaction(row,"send"), texttips['send'][0], 
+            bg='#EFEFEF', 
+            p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',8,E+W+N+S,pady_row,self.ColumnPadx(col)], 
+            isList=True,
+            msg = texttips['send'][1]
+            )
+
+        col +=1
+        bdelete = ClassButtonGrid(
+            form,self.form22_rows,col,lambda:PSWaction(row,"delete"),'x',
+            fg='red', 
+            bg='#EFEFEF' ,
+            p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',3,E+W+N+S,pady_row,self.ColumnPadx(col)], 
+            isList=True,
+            msg = 'Delete this row'
+            )
+        
+        WindX['form_widgets'][self.form22_rows] = [
+            sv_fieldname, sv_value, sv_fieldnameShort, sv_ischeck,            #0-3
+            bdelete.b,    ef,       ev,                bsend.b,               #4-7
+            efs,          ef_chkb,  bcopy.b,           sv_ischeck_extension,  #8-11
+            ef_chkb_extension,      bcopy.balloon, bsend.balloon              #12-14
+        ]
+
+        if para['field_name_short'] and self.frame21 and para['ischeck']:
+            self.form21_colnums +=1
+
+            shortname = para['field_name_short']
+            if para['ischeck_package']:
+                shortname = "*" + para['field_name_short']
+
+            bs = ClassButtonGrid(
+                self.frame21,0,self.form21_colnums,lambda:PSWaction(row,"send"), shortname,
+                p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',0,E+W+N+S,1,1],
+                msg = para['field_name']
+                )
+            WindX['form_widgets_short'][self.form21_colnums] = bs.b
+
+    def UI_highlight_row(self, event=None, row=0, act=0):
+        fcolor = 'black'
+        bcolor = 'white'
+        if act:
+            fcolor = 'green'
+            bcolor = '#FFEFD5'
+
+        if WindX['form_widgets'] and WindX['form_widgets'].__contains__(row):
+            for i in [5,6,8]:
+                try:
+                    WindX['form_widgets'][row][i].configure(fg=fcolor, bg=bcolor)
+                except:
+                    pass
+
+    def WindExit(self):
+        UT_ClipboardEmpty()
+        if self.root:
+            self.root.destroy()
+        SaveLog(logFile='', isMainWin=True)
+        os._exit(0) 
+
+class ClassMouseClickWatcher():
+    def __init__(self,x,y):
+        WindX['load_times'].append([time.time(), 'MouseClickWatcher loading: ...'])
+
+        scale = UI_DeviceDisplayScale(x=x, needScaled=True)
+        dx = int(100*scale)
+        dy = int(15*scale)
+        sizes = [dx*3, dy*2]
+        xys   = [x-dx*2 - 2, y-dy]
+
+        self.isDisplay = True
+        self.x0 = x
+        self.y0 = y
+        self.tl = None
+        self.action = ""
+
+        if WindX['TopLevel_MessageAction']:
             try:
-                if display:
-                    if not WindX['form_widgets_short_display']:
-                        WindX['form_widgets_short'][col].grid()                    
-                else:
-                    if WindX['form_widgets_short_display']:
-                        WindX['form_widgets_short'][col].grid_remove()   
-
+                WindX['TopLevel_MessageAction'].destroy()
+                WindX['TopLevel_MessageAction'] = None            
             except:
-                print(traceback.format_exc()) 
+                pass
 
-    rect = win32gui.GetWindowRect(WindX['e_HideBase'].winfo_id()) #left top right bottom (18, 78, 522, 382)
-    if display:
-        WindX['form_widgets_short_display'] = 1
-        if not isForce:
-            w = WindX['win_pos']['orig_width']
-            if w < rect[2] - rect [0]:
-                w = rect[2] - rect [0]
-            h = WindX['win_pos']['toolbar_height']
-            if h < rect[3] - rect [1]:
-                h = rect[3] - rect [1]
-            WindX['main'].geometry(str(w) + 'x' + str(h) + '+' + WindX['win_pos']['geo_xy'])
-        ShowHideBasic2_Delay()
-    else:
-        WindX['form_widgets_short_display'] = 0        
-        #print('e_HideBase GetWindowRect=',rect)
-        geos = re.split(r'\D',WindX['main'].geometry(),re.I)
-        width_0 = int(geos[0])
-        width_1 = rect[2] - rect [0] + 2
-        while width_0 > width_1:
-            width_0 -= 2
-            WindX['main'].geometry(str(width_0) + 'x' + str(WindX['win_pos']['toolbar_height']) + '+' + WindX['win_pos']['geo_xy'])
-            WindX['main'].update()
-
-    if isDelay:
-        WindX['form_widgets_short_display_delay_done'] = 1
-
-def ShowHideBasic():
-    if not WindX['win_pos']['orig_width']:
-        WindX['win_pos']['orig_width'] = WindX['main'].winfo_width()        
-
-    if WindX['ShowHideBasic'] == 1:
-        WinEnableEntry(wid=WindX['main'], state="disabled", act=1)
-
-        WindX['ShowHideBasic'] = 0
-        WindX['Frame1'].grid_remove()
-        WindX['Frame2'].grid_remove()
-        WindX['e_HideBase'].config(text="  ∨ ")
-        geos = re.split(r'\D',WindX['main'].geometry(),re.I)
-        WindX['win_pos']['geo_xy'] = geos[2]
-
-        if not WindX['win_pos']['toolbar_height']:
-            WindX['main'].update()
-            WindX['win_pos']['toolbar_height'] = WindX['main'].winfo_height()
-
-        rect = win32gui.GetWindowRect(WindX['e_HideBase'].winfo_id()) #left top right bottom (18, 78, 522, 382)
-        w = WindX['win_pos']['orig_width']
-        if w < rect[2] - rect [0]:
-            w = rect[2] - rect [0]
-        h = WindX['win_pos']['toolbar_height']
-        if h < rect[3] - rect [1]:
-            h = rect[3] - rect [1]
-        WindX['main'].geometry(str(w) + 'x' + str(h) + '+' + WindX['win_pos']['geo_xy'])
-        WindX['main'].overrideredirect(1)
-
-        WindX['form_widgets_short_display_delay_done'] = 1
-        ShowHideBasic2_Delay(10)
-    else:
-        WinEnableEntry(wid=WindX['main'], state="normal", act=1)
-
-        WindX['main'].geometry("")
-        ShowHideBasic2(True,1,0)
-        WindX['ShowHideBasic'] = 1
-        WindX['Frame1'].grid()
-        WindX['Frame2'].grid()
-        WindX['e_HideBase'].config(text="  ∧ ")
-        WindX['main'].overrideredirect(0)
-
-def Init(IsInit=1): 
-    WindX['main'] = Tix.Tk()
-    WindX['main'].title("My Wallet")
-    WindX['main'].configure(bg='#A0A0A0')
-    WindX['main'].geometry('+' + str(WindX['mainPX']) + '+' + str(WindX['mainPY']))
-    WindX['main'].wm_attributes('-topmost',1) 
-    #WindX['main'].overrideredirect(1)
-    WindX['main'].protocol("WM_DELETE_WINDOW", WindExit)
-
-    WindX['Frame3'] = Frame(WindX['main'],bg='#E0E0E0')
-    WindX['Frame3'].grid(row=0,column=0,sticky=E+W+S+N,pady=0,padx=0)
-
-    WindX['Frame1'] = Frame(WindX['main'],bg='#E0E0E0')
-    WindX['Frame1'].grid(row=1,column=0,sticky=E+W+S+N,pady=1,padx=0)
-    WindX['Frame2'] = Frame(WindX['main'],bg='#E0E0E0')
-    WindX['Frame2'].grid(row=2,column=0,sticky=E+W+S+N,pady=0,padx=0)
+        if self.isDisplay:
+            UI_ToplevelRect(sizes, xys, icolor='#FF6666')  #F6F6F6
+        try:       
+            self.im_PIL,err = UT_ScreenShotXY(width=sizes[0],height=sizes[1],xSrc=xys[0],ySrc=xys[1])
+            self.OCR_Run()
+        except:
+            UT_Print2Log('red', sys._getframe().f_lineno, traceback.format_exc())
+            UI_ToplevelRectHide()    
     
-    balstatus = Label(WindX['main'], justify=CENTER, relief=FLAT,pady=3,padx=3, bg='yellow',wraplength = 50)
-    #balstatus.grid(row=4,column=0,sticky=E+W+S+N,pady=0,padx=0)
-    WindX['winBalloon'] = Tix.Balloon(WindX['main'], statusbar = balstatus)
+    def OCR_Run(self, ):
+        self.sstime = time.time()
 
-    hideshow_icon = '  ∧  '
+        self.results = {
+            'image_to_boxes':None,
+            'image_to_data':None,
+            'image_to_string': [],
+            'image_data_paddle': [],
+            'result_parsed': []
+        }
 
-    if WindX['Frame1']:
-        WindX['form_rows'] +=1
+        is_to_crop_class = False
+        try:       
+            if self.im_PIL:
+                sizes  = self.im_PIL.size
+                pixels = sizes[0]*sizes[1]
 
-        row = 0  
-        Label(WindX['Frame1'], text='Encrypt / Decrypt Code', justify=CENTER, relief=FLAT,pady=3,padx=3, bg='#E0E0E0').grid(row=row,column=0,sticky=E+W,columnspan=2)
-        WindXX['EncryptCode'] = StringVar()
-        e=Entry(WindX['Frame1'], justify=LEFT, relief=FLAT, textvariable= WindXX['EncryptCode'], show="*")
-        e.grid(row=row,column=2,sticky=E+W,columnspan=2,pady=0,padx=1)
-        e.insert(0,WindX['EncryptCode'])
-        e.bind('<FocusIn>',func=handlerAdaptor(CapLockStatus,e=e))
-        e.bind('<KeyRelease>',func=handlerAdaptor(CapLockStatus,e=e))
-        e.bind('<Leave>',func=handlerAdaptor(SeeMe,e=e,ishow='*'))
-        e.focus()
-        WindX['e_EncryptCode'] = e
+                output=BytesIO()
+                self.im_PIL.save(output, format='PNG')
+                im = Image.open(output)
+                #byte_data = output.getvalue()         
+                UT_Print2Log('', "\nImage ORC\n--------------------------------------------\nimage.size=", im.size)    
 
-        WindXX['delay2send'] = StringVar()
-        e2=Entry(WindX['Frame1'], justify=CENTER, relief=FLAT, textvariable= WindXX['delay2send'])
-        e2.grid(row=row,column=4,sticky=E+W,columnspan=2,pady=0,padx=1)
-        e2.insert(0,0)
-        WindX['e_delay2send'] = e2
-        WindX['winBalloon'].bind_widget(e2, balloonmsg= 'Delay to send, seconds after click')
+                if not WindX['win_ocr_PaddleOCR']:
+                    WindX['win_ocr_PaddleOCR'] = PaddleOCR_Load()
+                try:
+                    stime = time.time()
+                    iOCR = PaddleOCR_Class(PaddleOCR=WindX['win_ocr_PaddleOCR'], im=im, is_to_crop=is_to_crop_class)
+                    iOCR.run()
+                    """
+                    iOCR.results as:
+                        self.results = {
+                            'image_to_string': [],  #all text in block
+                            'image_data_paddle': [],  #all lines [[box1, text1, probability1], [box2, text2, probability2], ...]
+                            'result_parsed': [] #all text in sequency
+                        }
+                    """
+                    self.results['image_data_paddle'] = iOCR.results['image_data_paddle']
+                    self.results['image_to_string']   = iOCR.results['image_to_string']
+                    self.results['result_parsed']     = iOCR.results['result_parsed']
 
-        xlbl = Label(WindX['Frame1'], text='0', justify=CENTER, relief=FLAT,pady=3,padx=3, bg='#E0E0E0', fg='#A0A0A0')
-        xlbl.grid(row=row,column=10,sticky=E+W,pady=0,padx=1)
-        WindX['e_label_next_rest'] = xlbl
-        WindX['winBalloon'].bind_widget(xlbl, balloonmsg= 'Seconds to get coffee')
-        
-    if WindX['Frame2']: 
-        row = 0 
-        iButton(WindX['Frame2'],row,0,lambda:PSWaction(0,"get"),'Open', width=10) 
-        #iSeparator(WindX['Frame2'],row,1)
-        
-        iButton(WindX['Frame2'],row,2,lambda:PSWaction(0,"save"),'Save', width=10)  
-        #iSeparator(WindX['Frame2'],row,3)    
+                    if not WindX['win_ocr_used_time'].__contains__('PaddleOCR'):
+                        WindX['win_ocr_used_time']['PaddleOCR'] = {}
+                    if not WindX['win_ocr_used_time']['PaddleOCR'].__contains__(pixels):
+                        WindX['win_ocr_used_time']['PaddleOCR'][pixels] = []
 
-        b = iButton(WindX['Frame2'],row,4,lambda:PSWaction(0,"new"),'New', width=10)  
-        #iSeparator(WindX['Frame2'],row,5)
-        WindX['winBalloon'].bind_widget(b.b, balloonmsg= 'Add new row')
+                    WindX['win_ocr_used_time']['PaddleOCR'][pixels].append([stime, time.time()])
+                except:
+                    UT_Print2Log('red', sys._getframe().f_lineno, "\nTry PaddleOCR and get error:\n" + traceback.format_exc())
 
-        b = iButton(WindX['Frame2'],row,6,lambda:PSWaction(0,"Anchor"),'Anchor', width=10)  
-        WindX['winBalloon'].bind_widget(b.b, balloonmsg= 'Anchor at the point (0,0)')
-
-        b = iButton(WindX['Frame2'],row,7,lambda:PSWaction(0,"LoginCiscoVPN"),'Cisco VPN', width=10)  
-        WindX['winBalloon'].bind_widget(b.b, balloonmsg= 'Login Cisco VPN')
-        
-    if WindX['Frame3']: 
-        b = iButton(WindX['Frame3'],0,1,ShowHideBasic,hideshow_icon, width=4)
-        WindX['e_HideBase'] = b.b  
-        WindX['ShowHideBasic'] = 1
-
-        b = iButton(WindX['Frame3'],0,2,ShowHideBasic2X,' < ', width=4)
-        WindX['e_HideToolbar'] = b.b 
-
-        WindX['Frame3_colnum'] = 2
-
-        xlbl = Label(WindX['Frame3'], text='Input [Code], then [Open] to load data ...', justify=CENTER, relief=FLAT,pady=3,padx=3, bg='yellow')
-        xlbl.grid(row=0,column=3,sticky=E+W,columnspan=2)
-        WindX['e_warnLabel'] = xlbl
-
-    HideConsole()
-    ctypes.windll.shcore.SetProcessDpiAwareness(1)
-    t4 = threading.Timer(1,GetMonitors)
-    t4.start()
-
-    t5 = threading.Timer(2,ReminderCheckMeeting)
-    t5.start()
-    mainloop()
-
-def ColumnPadx(col):
-    if col % 2:
-        return 1
-    else:
-        return 0
-
-def UIaddNewRow(form, para,addNew=None):
-    WindX['form_rows'] +=1
-    row = WindX['form_rows']
-    col = 0
-    pady_row = 0
-    if WindX['form_rows'] % 2:
-        pady_row = 1
-    
-    sv_ischeck = IntVar()
-    ef_chkb = Checkbutton(form, text= WindX['form_rows'] - 1, variable= sv_ischeck, justify=LEFT, fg='#009900', bg='#E0E0E0', relief=FLAT)
-    ef_chkb.grid(row=WindX['form_rows'],column=col,sticky=E+W+N+S,padx=ColumnPadx(col),pady=pady_row)
-    if para['ischeck']:
-        ef_chkb.select()
-    WindX['winBalloon'].bind_widget(ef_chkb, balloonmsg= 'Checked to show on the toolbar')
-
-    col +=1
-    sv_fieldname = StringVar()
-    ef=Entry(form, justify=LEFT, relief=FLAT, textvariable= sv_fieldname, width=30)
-    ef.grid(row=WindX['form_rows'],column=col,sticky=E+W+N+S,padx=ColumnPadx(col),pady=pady_row)
-    ef.insert(0,para['field_name'])
-    ef.bind('<FocusIn>',func=handlerAdaptor(CapLockStatus,e=ef))
-    ef.bind('<KeyRelease>',func=handlerAdaptor(CapLockStatus,e=ef))
-    if addNew:
-        ef.focus()
-    WindX['winBalloon'].bind_widget(ef, balloonmsg= 'Field Name')
-
-    col +=1
-    sv_fieldnameShort = StringVar()
-    efs=Entry(form, justify=LEFT, relief=FLAT, textvariable= sv_fieldnameShort,width=6)
-    efs.grid(row=WindX['form_rows'],column=col,sticky=E+W+N+S,padx=ColumnPadx(col),pady=pady_row)
-    efs.insert(0,para['field_name_short'])
-    efs.bind('<FocusIn>',func=handlerAdaptor(CapLockStatus,e=ef))
-    efs.bind('<KeyRelease>',func=handlerAdaptor(CapLockStatus,e=ef))
-    WindX['winBalloon'].bind_widget(efs, balloonmsg= 'Short Field Name')
-    
-    col +=1
-    sv_value = StringVar()
-    ev=Entry(form, justify=LEFT, relief=FLAT, textvariable= sv_value, show="*", width=30)
-    ev.grid(row=WindX['form_rows'],column=col,sticky=E+W+N+S,padx=ColumnPadx(col),pady=pady_row)
-    ev.insert(0,para['field_value'])
-    ev.bind('<FocusIn>',func=handlerAdaptor(CapLockStatus,e=ev))
-    ev.bind('<KeyRelease>',func=handlerAdaptor(CapLockStatus,e=ev))
-    ev.bind('<Leave>',func=handlerAdaptor(SeeMe,e=ev,ishow='*'))  
-    WindX['winBalloon'].bind_widget(ev, balloonmsg= 'Field Value to be sent')
-
-    col +=1
-    bsend = iButton(form,WindX['form_rows'],col,lambda:PSWaction(row,"send"),'Send',p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',6,E+W+N+S,pady_row,ColumnPadx(col)])
-    WindX['winBalloon'].bind_widget(bsend.b, balloonmsg= 'Send field value of ' + para['field_name'])
-
-    col +=1
-    bdelete = iButton(form,WindX['form_rows'],col,lambda:PSWaction(row,"delete"),'x',fg='red',p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',3,E+W+N+S,pady_row,ColumnPadx(col)])
-    WindX['winBalloon'].bind_widget(bdelete.b, balloonmsg= 'Delete this row')
-
-    WindX['form_widgets'][WindX['form_rows']] = [sv_fieldname,sv_value, sv_fieldnameShort, sv_ischeck, bdelete.b, ef, ev, bsend.b, efs, ef_chkb]
-
-    if para['field_name_short'] and WindX['Frame3'] and para['ischeck']:
-        WindX['Frame3_colnum'] +=1
-        bs = iButton(WindX['Frame3'],0,WindX['Frame3_colnum'],lambda:PSWaction(row,"send"),para['field_name_short'],p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',4,E+W+N+S,1,1])
-        WindX['form_widgets_short'][WindX['Frame3_colnum']] = bs.b
-        WindX['winBalloon'].bind_widget(bs.b, balloonmsg= para['field_name'])
-
-    if para['field_name_short'] == 'JPSW':
-        WindX['LoginPSW'] = para['field_value']
-    elif para['field_name_short'] == 'JCOD':
-        WindX['LoginSCD'] = para['field_value']
-    elif para['field_name_short'] == 'JWID':
-        WindX['LoginID']  = para['field_value']
-
-class iSeparator:
-    def __init__(self,frm,row=0,col=0,txt='|',fg='#FFFFFF',bg='#E0E0E0',p=[CENTER,FLAT,0,0]):
-        self.label = Label(frm, 
-                            text=txt, 
-                            justify=p[0], 
-                            relief=p[1],
-                            pady=p[2],
-                            padx=p[3],
-                            fg=fg,
-                            bg=bg
-                            )
-        self.label.grid(
-                    row=row,
-                    column=col,
-                    sticky=E+W+N+S,
-                    pady=0,
-                    padx=0,
-                        )
+                if len(self.results['image_to_string']):
+                    if self.isDisplay:
+                        ocr_result = []
+                        if len(self.results['result_parsed']):
+                            ocr_result = self.results['result_parsed'][0]                
                         
-class iButton:
+                        UI_ClassToplevelMessage("\n".join(ocr_result), 'yellow', 'red', pos=[self.x0, self.y0])
+
+                        if WindX['keyboard_keyAltPress']:
+                            UT_ClipboardInertText("\n".join(ocr_result))                
+
+                        UT_Print2Log('green', "\n".join(ocr_result))
+                        UT_Print2Log('', self.results['image_to_boxes'])
+
+                    self.ReactionPre(''.join(self.results['image_to_string']))
+                #UT_Print2Log('', "\n--------------------------------------------\n")
+                output.close()
+        except:
+            UT_Print2Log('red', sys._getframe().f_lineno, "Try OCR ...,\nand get error:\n" + traceback.format_exc())
+            #messagebox.showwarning(title='OCR Warning', message= "Try OCR ...\nthen get the error:\n\n" + traceback.format_exc())
+
+        UT_Print2Log('', sys._getframe().f_lineno, 'Image_OCR_Result used time:', UT_UsedTime(self.sstime), '\n')
+
+        if self.isDisplay:
+            t1 = threading.Timer(0.01,UI_ToplevelRectHide)
+            t1.start()   
+
+    def ReactionPre(self, text):        
+        if re.match(r'.*Password',text,re.I):
+            self.action = 'show-send-password'
+        elif re.match(r'.*(username|user\s+name|login|logon)',text,re.I):
+            self.action = 'show-username'
+        elif re.match(r'.*answer',text,re.I):
+            self.action = 'show-send-code'
+        self.ReactionGo()
+        
+    def ReactionGo(self):
+        UT_Print2Log('blue', "watch click - action=", self.action)
+        if not self.action:
+            return
+        
+        elif self.action == 'close':
+            try:
+                self.tl.destroy()            
+            except:
+                pass
+            WindX['TopLevel_MessageAction'] = None
+            return
+
+        try:
+            hasButton = 0
+            patterns = {
+                'show-send-password': '(Password|PSW)',
+                'show-username': '(user\s+name|username|\s+ID|Login|\s+name)',
+                'show-send-code': 'code'
+            }
+
+            findstr = ''
+            if patterns.__contains__(self.action):
+                findstr = patterns[self.action]
+
+            if findstr:
+                for irow in WindX['form_widgets']:
+                    field_name = WindX['form_widgets'][irow][0].get()
+                    if re.match(r'.*{}'.format(findstr), field_name, re.I):
+                        go = True
+                        if self.action == 'show-username' and re.match(r'.*{}'.format(patterns['show-send-password']), field_name, re.I):
+                            go = False
+                        if go:
+                            hasButton += 1
+
+            if hasButton == 0:
+                return
+
+            self.tl = Toplevel()
+            WindX['TopLevel_MessageAction'] = self.tl
+
+            dy = 40          
+            pos = win32api.GetCursorPos()
+            self.tl.geometry('+'+ str(pos[0]) +'+' + str(pos[1] + dy))
+            frm = Frame(self.tl,bg='yellow')
+            frm.grid(row=1,column=0,sticky=E+W+S+N,pady=5,padx=5)
+            self.xlbl = Label(frm, text='10', justify=CENTER, relief=FLAT,pady=2,padx=2, bg='yellow', fg='#A0A0A0', width=3)
+            self.xlbl.grid(row=0,column=0,sticky=E+W,pady=1,padx=1)
+            col = 0
+            row = 0
+            if findstr:        
+                delstr = True
+                for irow in WindX['form_widgets']:
+                    field_name = WindX['form_widgets'][irow][0].get()
+
+                    if re.match(r'.*{}'.format(findstr), field_name, re.I):
+                        go = True
+                        if self.action == 'show-username' and re.match(r'.*{}'.format(patterns['show-send-password']), field_name, re.I):
+                            go = False
+                        if go:                        
+                            col += 1
+                            short = WindX['form_widgets'][irow][2].get()
+                            self.ReactionButton(frm, row, col, irow, short, field_name, delstr)
+                            if col >= 4:
+                                row +=1
+                                col = 0
+            
+            UI_WidgetFontSetAtPoint(wid=self.tl, widName="button", point=[self.x0, self.y0])
+            self.tl.wm_attributes('-topmost',1)
+            self.tl.overrideredirect(1)
+            self.tl.update()
+
+            t1 = threading.Timer(0.1,self.ButtonCloseDelay)
+            t1.start()
+        except:
+            UT_Print2Log('red', sys._getframe().f_lineno, traceback.format_exc())    
+
+    def ButtonCloseDelay(self):
+        s = 10
+        while True:
+            time.sleep(1)
+            s = s - 1
+            if s <= 0:
+                break
+            try:
+                self.xlbl.configure(text=s)
+                self.tl.update()
+            except:
+                break
+        
+        self.action = "close"
+        self.ReactionGo()
+
+    def ReactionButton(self, frm, row, col, irow, short, field_name, delstr):
+        bs = ClassButtonGrid(frm,row,col,lambda:self.ReactionButtonGo(irow,delstr),field_name,p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',0,E+W+N+S,1,1], TexAnchor=W)
+        UI_WidgetBalloon(bs.b,  field_name)
+
+    def ReactionButtonGo(self, irow, delstr):
+        PSWaction(irow,"send",delstr=delstr)
+
+        try:
+            WindX['TopLevel_MessageAction'] = None
+            self.tl.destroy()        
+        except:
+            pass    
+
+class ClassMouseListener():
+    def __init__(self,):
+        WindX['load_times'].append([time.time(), 'MouseListener loading: ...'])
+        with mouseListener(on_click=self.OnClick) as listener: #(on_move=on_move, on_click=on_click, on_scroll=on_scroll) 
+            listener.join()
+
+    def OnClick(self, x, y, button, pressed):
+        dtime = time.time() - WindX['mouse_last_time_click'][0] 
+        #UT_Print2Log('', sys._getframe().f_lineno, dtime, button,'{0} at {1}'.format('Pressed' if pressed else 'Released', (x, y)))
+        if not pressed:
+            if re.match(r'.*left',str(button),re.I):
+                WindX['mouse_click_points'].append([x,y])        
+                ForeGroundWindow()
+                #UT_Print2Log('', sys._getframe().f_lineno, "mouse click - Foreground Window:", WindX['FGW'])
+                UT_ClipboardEmpty()
+
+                if WindX['FGW'][1][0]:
+                    WindX['mouse_click_last_points'] = [x,y, time.time(), WindX['FGW'][1][0], WindX['FGW'][1][1]]
+                    b = UT_WindowRectGet(WindX['FGW'][1][0])  #left, top, right, bottom
+                    UT_Print2Log('', sys._getframe().f_lineno, "Click point ["+ str(x) +", "+ str(y) +"], Foreground Window:", WindX['FGW'][1][1],", relative point (",x - b[0], y - b[1],"), win box=", b)
+                #UT_Print2Log('', sys._getframe().f_lineno, 'Click-OCR-Checked:', WindX['ClassWin'].var_Click_Watcher.get())
+                else:
+                    WindX['mouse_click_last_points'] = []
+
+                if WindX['ClassWin'].var_Click_Watcher.get():
+                    p = threading.Timer(0.001,ClassMouseClickWatcher, args=[x,y])
+                    p.start()
+                else:
+                    UI_ToplevelRectHide()
+
+            elif re.match(r'.*middle',str(button),re.I):
+                p = threading.Timer(0.001,ClassMouseClickWatcher, args=[x,y])
+                p.start()
+
+            '''
+            try:
+                if dtime <= 1:
+                    WindX['mouse_last_time_click'][0] = time.time()
+                    if button == mouse.Button.left:
+                        WindX['mouse_last_time_click'][1] +=1
+                        if WindX['mouse_last_time_click'][1] >=3 and WindX['row_shortname'].__contains__('JPSW'):                    
+                            WindX['mouse_last_time_click'] = [time.time(),0,0,0]
+                            print("# send password")
+                            t4 = threading.Timer(0.1,PSWaction,args=[WindX['row_shortname']['JPSW'],"send"])
+                            t4.start()
+
+                    elif button == mouse.Button.middle:
+                        WindX['mouse_last_time_click'][2] +=1
+                        if WindX['mouse_last_time_click'][2] >=3 and  WindX['row_shortname'].__contains__('JWID'):
+                            WindX['mouse_last_time_click'] = [time.time(),0,0,0]
+                            print("# send login ID") 
+                            t4 = threading.Timer(0.1,PSWaction,args=[WindX['row_shortname']['JWID'],"send"])
+                            t4.start()
+
+                    elif button == mouse.Button.right:
+                        WindX['mouse_last_time_click'][3] +=1
+                        if WindX['mouse_last_time_click'][3] >=3 and WindX['row_shortname'].__contains__('JCOD'):
+                            WindX['mouse_last_time_click'] = [time.time(),0,0,0]
+                            print("# send security code")
+                            t4 = threading.Timer(0.1,PSWaction,args=[WindX['row_shortname']['JCOD'],"send"])
+                            t4.start()
+
+                else:
+                    WindX['mouse_last_time_click'] = [time.time(),0,0,0]
+            except:
+                UT_Print2Log('red', sys._getframe().f_lineno, traceback.format_exc())
+            '''  
+
+class ClassKeyboardListener():
+    def __init__(self,):
+        WindX['load_times'].append([time.time(), 'KeyboardListener loading: ...'])
+        #return #not record key board input
+        # Collect events until released
+        with keyboardX.Listener(
+                on_press  = self.OnPress,
+                on_release= self.OnRelease) as listener:
+            listener.join()
+
+    def OnPress(self, key):
+        self.KeyPress(key, 'press')
+
+    def OnRelease(self, key):
+        #UT_Print2Log('', sys._getframe().f_lineno, '{0} released'.format(key))
+        #self.KeyIn(key,'release')
+
+        #if key == keyboardX.Key.esc:
+            # Stop listener
+        #    return False
+        self.KeyPress(key, 'release')
+    
+    def KeyPress(self, key, act):
+        try:
+            ikey = key.char
+        except AttributeError:
+            ikey = key
+        #通过属性判断按键类型。
+        #print('....', act, type(ikey),ikey)
+        try:
+            if act == 'press':
+                if ikey == keyboardX.Key.alt_l or ikey == keyboardX.Key.alt_r or ikey == keyboardX.Key.alt_gr:
+                    WindX['keyboard_keyAltPress'] = True
+                #if not ikey in WindX['keyboard_keyPress']:
+                #    WindX['keyboard_keyPress'].append(ikey)
+                
+                elif key == keyboardX.Key.esc:
+                    AlertScheduleEnd()
+
+            else:
+                if ikey == keyboardX.Key.alt_l or ikey == keyboardX.Key.alt_r or ikey == keyboardX.Key.alt_gr:
+                    WindX['keyboard_keyAltPress'] = False
+                #WindX['keyboard_keyPress'].remove(ikey)
+        except:
+            pass
+    
+    def KeyIn(self, key,act):
+        if WindX['ClassWin'].var_Click_Watcher.get():
+            try:
+                WindX['keys_input_words'].append([time.time(),act,key.char])
+            except AttributeError:
+                WindX['keys_input_words'].append([time.time(),act,key])
+            #通过属性判断按键类型。
+
+    def PrintRecords(self):
+        return
+        if not len(WindX['keys_input_words']):
+            return
+        UT_Print2Log('', "\n",sys._getframe().f_lineno, WindX['keys_input_words'])
+        WindX['keys_input_words'] = []
+
+class ClassCheckboxGrid:
+    def __init__(self,frm,row=0,col=0, cmd=None, txt='', fg='blue', bg='#E0E0E0', ischeck=0,
+                    colspan=1, width = 0, msg=None, isList=False, TexAnchor = CENTER,
+                    p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',0,E+W+N+S,0,0]):
+
+        if width:
+            p[6] = width
+
+        self.variable = IntVar()
+
+        self.b = Checkbutton(
+                    frm,
+                    text=txt, 
+                    variable= self.variable,
+                    fg=fg,
+                    bg=bg,
+                    justify=p[0], 
+                    anchor= TexAnchor,
+                    relief=p[1],
+                    padx=p[2],
+                    pady=p[3],                    
+                    activebackground=p[4],
+                    highlightbackground=p[5],
+                    width=p[6],
+                    command=cmd
+                    )
+        self.b.grid( row=row,
+                column=col,
+                sticky=p[7],
+                pady=p[8],
+                padx=p[9],
+                columnspan=colspan
+                )
+
+        if ischeck:
+            self.b.select()
+
+        self.b.bind('<Motion>',self.iMotion)
+        self.b.bind('<Leave>',self.iLeave)
+        self.bg = bg 
+        self.txt= txt   
+        self.isList=isList
+        self.row = row  
+        self.balloon = None         
+        
+        if msg:                
+            self.message = msg
+            self.balloon = UI_WidgetBalloon(self.b,  msg)
+        else:
+            self.message = ""
+
+    def iMotion(self,event):
+        self.b.config(bg = '#FFFFF0')
+        if self.isList:
+            WindX['ClassWin'].UI_highlight_row(None,self.row,1)
+
+    def iLeave(self,event):
+        self.b.config(bg = self.bg)
+        if self.isList:
+            WindX['ClassWin'].UI_highlight_row(None, self.row, 0)
+
+class ClassButtonGrid:
     def __init__(self,frm,row=0,col=0,cmd=None,txt='?',fg='blue',bg='#E0E0E0',
-                    colspan=1, width = 0,
+                    colspan=1, width = 0, msg=None, isList=False, TexAnchor = CENTER,
                     p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',0,E+W+N+S,0,0]):
 
         if width:
@@ -1128,6 +1507,7 @@ class iButton:
                     fg=fg,
                     bg=bg,
                     justify=p[0], 
+                    anchor= TexAnchor,
                     relief=p[1],
                     padx=p[2],
                     pady=p[3],                    
@@ -1147,195 +1527,287 @@ class iButton:
         self.b.bind('<Motion>',self.iMotion)
         self.b.bind('<Leave>',self.iLeave)
         self.bg = bg 
-        self.txt= txt              
+        self.txt= txt   
+        self.isList=isList
+        self.row = row  
+        self.balloon = None         
         
+        if msg:                
+            self.message = msg
+            self.balloon = UI_WidgetBalloon(self.b,  msg)
+        else:
+            self.message = ""
+
     def iMotion(self,event):
         self.b.config(bg = '#FFFFF0')
-        if self.txt== '  ∧  ':
-            ShowHideBasic2(True,0,0)
+        if self.isList:
+            WindX['ClassWin'].UI_highlight_row(None,self.row,1)
 
     def iLeave(self,event):
         self.b.config(bg = self.bg)
+        if self.isList:
+            WindX['ClassWin'].UI_highlight_row(None, self.row, 0)
+
+class ClassScrollableFrame(ttk.Frame):
+    def __init__(self, container, *args, **kwargs):
+        super().__init__(container, *args, **kwargs)
+        self.canvas = Canvas(self, 
+            width=500, 
+            height=300,
+            bg="#EFEFEF",
+            relief=FLAT,
+            bd = 0,
+        )
+        self.canvas.configure(highlightthickness = 0)
+
+        self.scrollbar_y = ttk.Scrollbar(self, orient="vertical",   command=self.canvas.yview)
+        #self.scrollbar_x = ttk.Scrollbar(self, orient="horizontal", command=self.canvas.xview)
+
+        gui_style = ttk.Style()
+        gui_style.configure('My.TFrame', background='#EFEFEF', padx=0, pady=0, relief=FLAT, bd=0)
+        self.scrollable_frame = ttk.Frame(self.canvas,style='My.TFrame')
+
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: self.canvas.configure(
+                scrollregion=self.canvas.bbox("all")
+            )
+        )
+
+        self.container = container        
+        container.bind("<Motion>", self.canvasMotion)
+        container.bind("<Leave>",  self.canvasLeave)
+        #container.bind("<MouseWheel>",  self.canvasMouseWheel)
+        
+        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+
+        self.canvas.configure(yscrollcommand=self.scrollbar_y.set)
+        #self.canvas.configure(xscrollcommand=self.scrollbar_x.set)
+
+        self.canvas.grid(row=0,column=0,sticky=E+W+N+S,padx=0,pady=0)
+        self.scrollbar_y.grid(row=0,column=1,sticky=N+S)
+        #self.scrollbar_x.grid(row=1,column=0,sticky=E+W) 
+
+        self.scrollbar_y_show = True
+
+        #- ttkFrame
+        #---- canvas (0, 0)
+        #-------- scrollable_frame
+        #---- scrollbar_y (0,1), scrollbar_y (1,1)
+
+    def canvasMouseWheel(self,e):
+        if self.scrollbar_y_show:
+            #print("canvasMouseWheel")
+            self.canvas.yview_scroll(int(-1*(e.delta/120)), "unit")
+
+    def canvasMotion(self,e):
+        return
+        self.scrollbar_y.grid()
+        self.scrollbar_y_show = True
+
+    def canvasLeave(self,e=None,fixSide='both'):
+        #fit frame22 to window size
+
+        #- root
+        #-- frame1
+        #-- frame2
+        #------ frame21: ⇡ ∧ (quick buttons)
+        #------ frame22: 
+        #--------- frame221x: 
+        #------------- frame2211: Encrypt / Decrypt Code, 
+        #------------- frame221 : data list
+        #--------- frame222: Open, Save, New, Anchor, Auto
+
+        #- ttkFrame (class)
+        #---- canvas (0, 0)
+        #-------- scrollable_frame ==> as frame221
+        #---- scrollbar_y (0,1), scrollbar_y (1,1)
+        
+        #print('container=', self.container)
+
+        if not WindX['win_orig_width']:
+            print('Not orig_width', WindX['win_orig_width'])
+            return
+
+        if WindX['ClassWin'].Frame2Hide_Yes:
+            return
+
+        if not WindX['ClassWin'].Frame22Show_Yes:
+            return
+
+        try:
+            rectCanv = UI_WidgetRectGET(self.canvas)     #left top right bottom (18, 382, 522, 399)
+            rectMain = UI_WidgetRectGET(WindX['ClassWin'].root)
+            rectFram = UI_WidgetRectGET(self.scrollable_frame)
+
+            CanvW = rectCanv[2] - rectCanv[0]
+            CanvH = rectCanv[3] - rectCanv[1]
+
+            MainW = rectMain[2] - rectMain[0]
+            MainH = rectMain[3] - rectMain[1]
+            geo = re.split(r'x|\+', WindX['ClassWin'].root.geometry())
+
+            FramW = rectFram[2] - rectFram[0]
+            FramH = rectFram[3] - rectFram[1]
+            FramPadxy = rectFram[0] - rectCanv[0]
+
+            #print("Before Win:", rectMain, MainW, MainH,", Canvas", rectCanv, CanvW, CanvH, ", Frame", rectFram, FramW, FramH, ", bar_oWidth", WindX['yscrollbar_oWidth'])
+            refresh_scroll = False
+
+            #1. check width
+            if fixSide == 'both' or fixSide == 'width':
+                caseText = ""
+                if CanvW - (FramW + FramPadxy*2) < 0:
+                    CanvW = FramW + FramPadxy*2
+                    if MainW > CanvW + WindX['yscrollbar_oWidth']*1.5 + FramPadxy*2:  
+                        CanvW = int(MainW - WindX['yscrollbar_oWidth']*1.5 - FramPadxy*2)
+                    self.canvas.configure(width = CanvW)
+                    refresh_scroll = True
+
+                    if MainW < CanvW + WindX['yscrollbar_oWidth'] + FramPadxy*2:                
+                        w = CanvW + WindX['yscrollbar_oWidth'] + FramPadxy*2
+                        if w < WindX['win_orig_width']:
+                            w = WindX['win_orig_width']
+                        pp = str(w) + 'x' + str(MainH) + '+' + str(geo[2]) + '+' + str(geo[3])
+                        if not (pp == WindX['ClassWin'].root.geometry()):
+                            print("win width #1 ->")
+                            UI_WinGeometry(WindX['ClassWin'].root, p= pp)
+
+                    caseText = "case-1\n"
+
+                elif CanvW - (FramW + FramPadxy*2) - WindX['yscrollbar_oWidth']*1.5 > 0 and  MainW < CanvW + WindX['yscrollbar_oWidth'] + FramPadxy*2:
+                        CanvW = FramW + FramPadxy*2
+                        if MainW  > CanvW + WindX['yscrollbar_oWidth']*1.5 + FramPadxy*2:  
+                            CanvW = int(MainW - WindX['yscrollbar_oWidth']*1.5 - FramPadxy*2)                
+
+                        self.canvas.configure(width = CanvW)
+                        refresh_scroll = True
+
+                        caseText = "case-2\n"
+
+                elif MainW > CanvW + WindX['yscrollbar_oWidth']*1.5 + FramPadxy*2:
+                    CanvW = int(MainW - WindX['yscrollbar_oWidth']*1.5 - FramPadxy*2)
+                    self.canvas.configure(width = CanvW)
+                    refresh_scroll = True
+
+                    caseText = "case-3\n"
+
+                elif MainW < int(CanvW + WindX['yscrollbar_oWidth']*1.5 + FramPadxy*2):            
+                    w = CanvW + WindX['yscrollbar_oWidth'] + FramPadxy*2
+                    if w < WindX['win_orig_width']:
+                        w = WindX['win_orig_width']  
+                    pp = str(int(w)) + 'x' + str(MainH) + '+' + str(geo[2]) + '+' + str(geo[3])
+                    if not (pp == WindX['ClassWin'].root.geometry()):   
+                        print("win width #2 ->") 
+                        UI_WinGeometry(WindX['ClassWin'].root, p= pp)
+                        refresh_scroll = True
+                        caseText = "case-4\n"
+
+                if caseText:
+                    UT_Print2Log('blue',"\nframe22: check and fit to width", caseText)
+
+                if not WindX['win_login_done']:
+                    self.scrollbar_y.grid_remove()
+                    self.scrollbar_y_show = False
+                    return
+
+            #2. check height
+            if fixSide == 'both' or fixSide == 'height':
+                caseText = ""
+                SceenH = MainH
+                for dp in WindX['display_scale']:
+                    if rectMain[0] >= dp[0] and rectMain[0] < dp[1]:
+                        SceenH = dp[5]
+                        break
+
+                rectFram1 = UI_WidgetRectGET(WindX['ClassWin'].frame1)
+                Fram1H = rectFram1[3] - rectFram1[1]
+
+                rectFram21 = UI_WidgetRectGET(WindX['ClassWin'].frame21)
+                Fram21H = rectFram21[3] - rectFram21[1] 
+
+                rectFram2211 = UI_WidgetRectGET(WindX['ClassWin'].frame2211)
+                Fram2211H = rectFram21[3] - rectFram21[1]
+
+                rectFram23 = UI_WidgetRectGET(WindX['ClassWin'].frame222)
+                Fram23H = rectFram23[3] - rectFram23[1] + Fram21H + Fram2211H
+
+                CanvHmax = int(SceenH*0.6) - Fram1H - Fram23H        
+                geo = re.split(r'x|\+', WindX['ClassWin'].root.geometry())
+
+                if (FramH + FramPadxy*2 >= CanvHmax*0.6 and MainH < int(SceenH*0.6)) or MainH > int(SceenH*0.6):
+                    print("win heigt #3 ->")         
+                    UI_WinGeometry(WindX['ClassWin'].root, p= geo[0] + 'x' + str(int(SceenH*0.6)) + '+' + str(geo[2]) + '+' + str(geo[3]))
+                    rectMain = UI_WidgetRectGET(WindX['ClassWin'].root)
+                    MainH = rectMain[3] - rectMain[1]
+                CanvCurA = MainH - Fram1H - Fram23H
+
+                if FramH + FramPadxy*2 > CanvH and (MainH < int(SceenH*0.6) or CanvH < CanvCurA) and (CanvH + Fram1H + Fram23H < int(SceenH*0.6)):
+                    CanvH = CanvCurA
+                    self.canvas.configure(height= CanvH)
+                    #UI_WinGeometry(WindX['ClassWin'].root, p= geo[0] + 'x' + str(MainH) + '+' + str(geo[2]) + '+' + str(geo[3]))
+                    refresh_scroll = True
+                    caseText = "case-5 Height\n"            
+                    
+                elif (FramH + FramPadxy*4 < CanvH) and CanvH - FramPadxy > CanvHmax:
+                    CanvH = FramH + FramPadxy*2
+                    self.canvas.configure(height= CanvH)
+                    
+                    caseText = "case-6 Height\n"
+
+                elif CanvH > CanvCurA:
+                    CanvH = CanvCurA
+                    self.canvas.configure(height= CanvH)
+                    
+                    caseText = "case-7 Height\n"
+
+                if caseText:
+                    UT_Print2Log('blue',"\nframe22: check and fit to height", caseText)
+
+            rectCanv = UI_WidgetRectGET(self.canvas)
+            CanvH = rectCanv[3] - rectCanv[1]
+            rectMain = UI_WidgetRectGET(WindX['ClassWin'].root)
+            MainH = rectMain[3] - rectMain[1]
+            CanvCurA = MainH - Fram1H - Fram23H
+            
+            refresh_scroll = True
+            
+            if FramH < CanvCurA:
+                self.scrollbar_y.grid_remove()
+                self.scrollbar_y_show = False
+                refresh_scroll = False
+            else:
+                self.scrollbar_y.grid()
+                self.scrollbar_y_show = True
+
+            if refresh_scroll:
+                CanvW = rectCanv[2] - rectCanv[0]
+                #print("refresh scroll:", refresh_scroll)          
+                self.canvas.configure(scrollregion=(0, 0, CanvW, FramH))
+            
+            #self.scrollbar_y_show = False
+            #self.scrollbar_y.grid_remove()
+            #self.scrollbar_x.grid_remove()
+        except:
+            UT_Print2Log('red', sys._getframe().f_lineno, traceback.format_exc())
 
 def main():
-    WindX['win_not_sending_key'] = 1
+    #UT_Print2Log('', "\npyWorkPage (JABIL-OPS-PCMS-Work-Project) -->",re.sub(r'^\s+|\s+$','',re.sub(r'([^a-zA-Z0-9\s])+',UT_ReplaceFunction,'pyWorkPage (JABIL-OPS-PCMS-Work-Project)')), "\n")
+    #MSTeams_Get_Calendar()
+    #"""
+    UT_FolderCreate(WindX['self_folder_log'])
 
-    delaySeconds = 1
-    t1 = threading.Timer(delaySeconds,ForeGroundWindowsCheck)
-    t2 = threading.Timer(delaySeconds,Init)
-    t3 = threading.Timer(delaySeconds,MouseListener)
+    t1 = threading.Timer(1,ForeGroundWindowsCheck)
+    t2 = threading.Timer(1, GUI_Init)
+    t3 = threading.Timer(5,ClassMouseListener)
+    t4 = threading.Timer(5,ClassKeyboardListener)
     t1.start()  
     t2.start()
     t3.start()
-    
-def ReminderCheckMeeting():
-    lastcheck_old = ""
-    tl = None
-    label1 = None
-    sleep_2next = 0
-    lastPopTime = ""
-    interval_refresh = 1 #seconds
-    while True:
-        if not WindX['main']:
-            break
+    t4.start()    
+    #"""
 
-        if sleep_2next > 0:
-            sleep_2next -= interval_refresh
-            try:
-                WindX['e_label_next_rest'].config(text= str(sleep_2next))
-                label1.configure(text=lastPopTime + ", refresh after " + str(sleep_2next) + ' seconds')
-                tl.update()
-            except:
-                pass
-        else:
-            lastPopTime = time.strftime("%Y-%m-%d %H:%M:%S",time.localtime(time.time()))
-            myLocalm = time.localtime() 
-            sleep_2next = (60-myLocalm.tm_min)*60 - myLocalm.tm_sec
-            #print(myLocalm) #time.struct_time(tm_year=2021, tm_mon=6, tm_mday=29, tm_hour=9, tm_min=38, tm_sec=50, tm_wday=1, tm_yday=180, tm_isdst=0)
-            lastcheck = str(myLocalm.tm_year) + "_" + str(myLocalm.tm_mon) + "_" + str(myLocalm.tm_mday) + "_" + str(myLocalm.tm_wday) + "_" + str(myLocalm.tm_hour)
-            if lastcheck != lastcheck_old:
-                lastcheck_old = lastcheck
-                if tl:
-                    tl.destroy()
+if __name__ == "__main__":  
+    main() 
 
-                tl = Toplevel(bg='black')
-                tl.title("Time to get rest!")
-                tl.wm_attributes('-topmost',1)        
-
-                tl.geometry('+0+0')
-                hwnd = win32gui.FindWindow(None, "Time to get rest!")
-                win32gui.ShowWindow(hwnd, win32con.SW_SHOWMAXIMIZED)
-                tl.overrideredirect(1)
-
-                font_type = tf.Font(size=48)
-                font_type2 = tf.Font(size=20)
-
-                label1 = Label(tl, text= lastPopTime + ", refresh after " + str(sleep_2next) + ' seconds', justify=CENTER, relief=FLAT,pady=10,padx=10, bg='black', fg='white', font=font_type2)
-                label1.pack(side=TOP, fill=X)
-
-                label = Label(tl, text="Time to get coffee,\n\nand check meetings for today!", justify=CENTER, relief=FLAT,pady=10,padx=10, bg='black', fg='white', font=font_type)
-                label.pack(side=TOP, fill=BOTH, expand=True)
-                
-                wh = 200
-                canvas = Canvas(tl,
-                            width=wh,
-                            height=wh,
-                            bg="black",
-                            relief=FLAT,
-                            bd = 0,
-                            )
-                canvas.configure(highlightthickness = 0)
-                canvas.pack(side=TOP) 
-                canvas.bind('<Button-1>',func=handlerAdaptor(ReminderCheckMeetingUIClosed,tl=tl)) 
-                WindX['winBalloon'].bind_widget(canvas, balloonmsg= 'Click to close this window!')
-
-                '''
-                b = Button(tl, 
-                            text="Close", 
-                            relief=FLAT,
-                            padx=5,
-                            pady=5,                    
-                            width=20,
-                            command=lambda:ReminderCheckMeetingUIClosed(tl=tl),
-                            font=font_type2,
-                            bg='#101010', fg='yellow'
-                            )
-
-                b.pack(side=BOTTOM, fill=X)
-                '''
-                t1 = threading.Timer(1,ReminderCheckMeetingUIClosed_delay, args=[tl, canvas, wh])
-                t1.start()
-        #print("ReminderCheckMeeting sleep", interval_refresh, " seconds")
-        time.sleep(interval_refresh)
-
-def ReminderCheckMeetingUIClosed_delay(tl, canvas, wh, delay_sec=60*15):
-    try:
-        delay_sec_o = delay_sec
-        width = 5
-        arc = canvas.create_arc(width,width,wh - width,wh - width,start=0,extent=360,outline='white',style=ARC,width=width)
-        arc2= canvas.create_arc(width*2,width*2,wh - width*2,wh - width*2,start=0,extent=0,outline='green',style=ARC,width=width)
-        txt= canvas.create_text(int(wh/2), int(wh/2), text=str(delay_sec), font=(WindX['WinDefaultFont_configure']['family'], 20), fill='white')
-        ts = 0
-        lastAngle2 = 0
-        while delay_sec > 0:        
-            angle=int(delay_sec/delay_sec_o*3600)/10
-            angle2 = int(ts*360)/10
-            if ts > 10:
-                ts = 0
-                lastAngle2 = 0
-            try:
-                canvas.itemconfig(arc,extent=angle)
-                canvas.itemconfig(arc2,start=lastAngle2,extent=angle2)
-                canvas.itemconfig(txt,text=str(int(delay_sec)))
-                tl.update()
-            except:
-                break
-            lastAngle2 = angle2
-            time.sleep(0.2)
-            delay_sec -= 0.2
-            ts += 0.2
-    except:
-        pass
-
-    ReminderCheckMeetingUIClosed(tl=tl)
-
-def ReminderCheckMeetingUIClosed(event=None, tl=None):
-    tl.destroy()
-
-def ForeGroundWindow():
-    try:
-        fgwHandle = win32gui.GetForegroundWindow()
-        if fgwHandle and WindX['win_not_sending_key']:
-            title = win32gui.GetWindowText(fgwHandle)
-            if title == "My Wallet":
-                return
-            WindX['FGW'][1] = [fgwHandle, title]
-
-            '''
-            if len(WindX['FGW'][1]) == 0:
-                WindX['FGW'][1] = [fgwHandle, win32gui.GetWindowText(fgwHandle)]
-                #print("FGW", WindX['FGW'])
-
-            elif len(WindX['FGW'][2]) == 0:
-                WindX['FGW'][2] = [fgwHandle, win32gui.GetWindowText(fgwHandle)]
-                #print("FGW", WindX['FGW'])
-
-            elif not (fgwHandle == WindX['FGW'][2][0]):
-                WindX['FGW'][1] = WindX['FGW'][2]
-                WindX['FGW'][2] = [fgwHandle, win32gui.GetWindowText(fgwHandle)]
-                #print("FGW", WindX['FGW'])
-            '''
-    except:
-        print(traceback.format_exc()) 
-
-def ForeGroundWindowsCheck():
-    WindX['FGW'] = {1:[],2:[]}
-
-    while True:
-        ForeGroundWindow()
-        time.sleep(0.1)
-
-def MouseOnClick(x, y, button, pressed):
-    #print(button,'{0} at {1}'.format('Pressed' if pressed else 'Released', (x, y)))
-    if re.match(r'.*left',str(button),re.I) and (not pressed):
-        WindX['mouse_click_points'].append([x,y])
-        ForeGroundWindow()
-        #print("mouse click - Foreground Window:", WindX['FGW'])
-
-def MouseOnMove(x, y): 
-    #print(x,y)   
-    try:
-        if WindX['TopLevel']:
-            winScale = MonitorScale(x,y)
-            WindX['TopLevel'].geometry('+'+ str(int(x/winScale)) +'+' + str(int(y/winScale) + 20))
-    except:
-        pass
-
-def MouseListener():
-    with Listener(on_click=MouseOnClick, on_move=MouseOnMove) as listener: #(on_move=on_move, on_click=on_click, on_scroll=on_scroll) 
-        listener.join()
-
-
-if __name__ == "__main__": 
-    main()
         
