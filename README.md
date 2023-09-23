@@ -8,6 +8,7 @@ a wallet to save my keys such as ID or passwords, with one encrypt or decrypt co
 --- common subroutines:  <br />
     mypyUtils.py <br />
     mypyUtilsUI.py <br />
+    mypyUtilzip.py <br />
     image_ocr_class2.py <br />
 
 --- UI: <br />
