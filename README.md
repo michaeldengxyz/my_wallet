@@ -2,21 +2,21 @@
 a wallet to save my keys such as ID or passwords, with one encrypt or decrypt code
 
 # Architecture (app constructure)
-## --- main file: 
-    MyWallet.py <br />
+## main file: 
+MyWallet.py
 
-## --- configuration file: 
-    MyWallet.ini.json <br />
+## configuration file: 
+MyWallet.ini.json 
 
-## --- common subroutines: 
-    mypyUtils.py <br />
-    mypyUtilsUI.py <br />
-    mypyUtilzip.py <br />
-    image_ocr_class2.py <br />
+## common subroutines: 
+mypyUtils.py 
+mypyUtilsUI.py
+mypyUtilzip.py
+image_ocr_class2.py
 
-## --- UI: 
-    --- Tab#1 wallet, actions: main UI <br />
-    --- Tab#2 Notes (TBD) <br />
+## UI: 
+Tab#1 wallet, actions: main UI
+Tab#2 Notes (TBD)
 
 # How to use
 ## Create wallet
