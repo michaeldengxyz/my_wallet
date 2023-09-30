@@ -5,7 +5,7 @@
 
 import time, sys, re
 import traceback
-from tkinter import Label, Toplevel, Canvas, Frame, Button, Tk
+from tkinter import Label, Toplevel, Canvas, Frame, Button, Tk, filedialog
 from tkinter import CENTER,FLAT,E,W,N,S,TOP,LEFT,X,BOTH,RIGHT,Y,ARC
 import tkinter.font as tf
 
@@ -28,6 +28,9 @@ WinUtilsUI['toplevel_lines'] = []
 WinUtilsUI['toplevel_Rect'] = []
 WinUtilsUI['toplevel_ClassToplevelMessage'] = None
 
+def UI_SetFolder(self_folder):
+    return filedialog.askdirectory(initialdir = self_folder)
+
 def UI_CapLockStatus(event,e=None):
     #UT_Print2Log('', event,':',e)   
     if win32api.GetKeyState(win32con.VK_CAPITAL) == 1:
@@ -40,6 +43,19 @@ def UI_CapLockStatus(event,e=None):
         if e:
             e.configure(background='#FFFFFF')
 
+def UI_WinWidgetRemove(wid=None, act=1):
+    try:
+        for item in wid.winfo_children():
+            #print('', "-"*act,item)
+            if item.winfo_children():
+                UI_WinWidgetRemove(wid=item,act=act+1)
+            try:
+                item.destroy()
+            except:
+                pass
+    except:
+        pass
+    
 def UI_WidgetEntryShow(event,e=None,ishow=''):
     e.config(show=ishow)
 

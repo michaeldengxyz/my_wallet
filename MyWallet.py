@@ -3,7 +3,7 @@
 
 
 WindX  = {}
-WindX['app_rev'] = '7.0'
+WindX['app_rev'] = '8.0'
 
 """
 #required
@@ -36,8 +36,41 @@ WindX['load_times'].append([time.time(), 'app start and load basic modules ...']
 
 import traceback
 import re
-import os,sys
+import os,sys,glob
 #os.system('cls')
+
+#------------------------------
+self_sys_argv0  = os.path.basename(sys.argv[0])
+self_folder = ""
+def find_real_file(ofile):
+    self_folder = ""
+    dirname = os.path.abspath(os.path.dirname(ofile))
+    if dirname and os.path.exists(dirname):
+        self_folder = re.sub(r'\\','/', dirname)
+    else:
+        fname = os.path.basename(ofile)        
+        for root, dirs, files in os.walk(os.getcwd(), topdown=True):
+            for name in files:
+                if re.match(r'.*{}$'.format(fname), str(name), re.I):
+                    print(sys._getframe().f_lineno,"find file:", name)
+                    self_folder = re.sub(r'\\','/',os.path.abspath(os.path.dirname(name)))
+                    break
+            if self_folder:
+                break
+    return self_folder
+
+if os.path.exists(sys.argv[0]):
+    self_folder = re.sub(r'\\','/',os.path.abspath(os.path.dirname(sys.argv[0])))
+
+if not (self_folder and os.path.exists(self_folder + '/MyWallet.ini.json')):
+    self_folder = find_real_file(sys.argv[0])
+
+print("\n#MW", sys._getframe().f_lineno,"root:", self_folder, "\n")
+if not (self_folder and os.path.exists(self_folder + '/MyWallet.ini.json')):
+    print(sys._getframe().f_lineno,"\n=========================== Failed to find root path!! ===========================\n")
+    os._exit(0)
+sys.path.append(self_folder)
+#------------------------------
 
 from mypyUtilzip import UZ_Check
 UZ_Check(filename="mypyUtils",   fileExt='py')
@@ -76,6 +109,8 @@ from image_ocr_class2 import PaddleOCR_Class, PaddleOCR_Load
 WindX['load_times'].append([time.time(), 'app load modules - end.'])
 WindXX = {}
 WindX['self_folder'], WindX['pcName'], curUser = UT_GetInfoAppRoot()
+if not (self_folder == WindX['self_folder']):
+    WindX['self_folder'] = self_folder
 
 WindX['self_folder_log'] = WindX['self_folder'] + '/MyWallet_Log'
 
@@ -120,6 +155,12 @@ if WindX['configs'] and WindX['configs'].__contains__('configuration'):
         UT_Print2Log('green', "\t" + cf, WindX['configs']['configuration'][cf])
         WindX[cf] = WindX['configs']['configuration'][cf]['value']
 UT_Print2Log('',"")
+
+def Revisons():
+    WindX['main_rev_list'] ={
+        '7.0': "initiation",
+        '8.0': "add new functions to manage encrypted files"
+    }
 
 def ConfigurationSave(): 
     try:
@@ -382,67 +423,86 @@ def PSWaction(row=0,act=None,filename=None,delstr=False):
             if filename:
                 try:                   
                     fdata = UT_FileOpen(filename)
-                    data  = json.loads(UT_CryptMe(fdata,key=UT_GetMD5(WindX['EncryptCode']), isEncript=False))
+                    ffdata = UT_CryptMe(fdata,key=UT_GetMD5(WindX['EncryptCode']), isEncript=False)
+                    if ffdata:
+                        data  = json.loads(ffdata)
+                        #UT_Print2Log('', data)
+                        if data.__contains__('1'):     
+                            if WindX['ClassWin'].form21_colnums > 1:               
+                                for i in range(3,WindX['ClassWin'].form21_colnums+1):
+                                    if WindX['form_widgets_short'].__contains__(i):
+                                        try:
+                                            WindX['form_widgets_short'][i].destroy()
+                                        except:
+                                            pass
 
-                    #UT_Print2Log('', data)
-                    if data.__contains__('1'):     
-                        if WindX['ClassWin'].form21_colnums > 1:               
-                            for i in range(3,WindX['ClassWin'].form21_colnums+1):
-                                if WindX['form_widgets_short'].__contains__(i):
+                            for irow in WindX['form_widgets']:
+                                for i in range(4,len(WindX['form_widgets'][irow])):
+                                    #UT_Print2Log('', WindX['form_widgets'][row][i])
                                     try:
-                                        WindX['form_widgets_short'][i].destroy()
+                                        WindX['form_widgets'][irow][i].destroy()
                                     except:
                                         pass
 
-                        for irow in WindX['form_widgets']:
-                            for i in range(4,len(WindX['form_widgets'][irow])):
-                                #UT_Print2Log('', WindX['form_widgets'][row][i])
-                                try:
-                                    WindX['form_widgets'][irow][i].destroy()
-                                except:
-                                    pass
-
-                        WindX['form_widgets'] = {}
-                        WindX['ClassWin'].form22_rows =1
-                        WindX['form_widgets_short'] = {}
-                        WindX['ClassWin'].form21_colnums = 2
-                        
-                        ToNewRows = []                        
-                        for i in data:
-                            if not i == 'others':
-                                #print(i, data[i])
-                                #data[i]: {'field_name': 'JBL-Windows ID', 'field_value': 'dengm', 'field_name_short': 'JWID', 'ischeck': 0},
-                                if not data[i].__contains__('field_name_short'):
-                                    data[i]['field_name_short'] = ''
-                                if not data[i].__contains__('ischeck'):
-                                    data[i]['ischeck'] = 0
-                                if not data[i].__contains__('ischeck_package'):
-                                    data[i]['ischeck_package'] = 0
-                                
-                                fname = str(data[i]['field_name' ])
-                                ToNewRows.append([fname[0].upper() + fname[1:], data[i]['field_value'], data[i]['field_name_short'], data[i]['ischeck'], data[i]['ischeck_package']])
-
-                        if len(ToNewRows):
-                            for s in sorted(ToNewRows, key=lambda x:x[0]):
-                                WindX['ClassWin'].UIaddNewRow(WindX['ClassWin'].frame221, 
-                                            {'field_name' : s[0],
-                                             'field_value': s[1],
-                                             'field_name_short': s[2],
-                                             'ischeck': s[3],
-                                             'ischeck_package': s[4]
-                                            })                                
+                            WindX['form_widgets'] = {}
+                            WindX['ClassWin'].form22_rows =1
+                            WindX['form_widgets_short'] = {}
+                            WindX['ClassWin'].form21_colnums = 2
                             
-                        WindX['win_login_done'] = True
+                            ToNewRows = []                        
+                            for i in data:
+                                if not i == 'others':
+                                    #print(i, data[i])
+                                    #data[i]: {'field_name': 'JBL-Windows ID', 'field_value': 'dengm', 'field_name_short': 'JWID', 'ischeck': 0},
+                                    if not data[i].__contains__('field_name_short'):
+                                        data[i]['field_name_short'] = ''
+                                    if not data[i].__contains__('ischeck'):
+                                        data[i]['ischeck'] = 0
+                                    if not data[i].__contains__('ischeck_package'):
+                                        data[i]['ischeck_package'] = 0
+                                    
+                                    fname = str(data[i]['field_name' ])
+                                    ToNewRows.append([fname[0].upper() + fname[1:], data[i]['field_value'], data[i]['field_name_short'], data[i]['ischeck'], data[i]['ischeck_package']])
 
-                        UI_WinFontSet(force=True, mainWin=WindX['ClassWin'].root)
-                        WindX['ClassWin'].root.update()
-                        t4 = threading.Timer(0.5, WindX['ClassWin'].ClassScrollableFrame.canvasLeave)
-                        t4.start()                        
+                            if len(ToNewRows):
+                                for s in sorted(ToNewRows, key=lambda x:x[0]):
+                                    WindX['ClassWin'].UIaddNewRow(WindX['ClassWin'].frame221, 
+                                                {'field_name' : s[0],
+                                                'field_value': s[1],
+                                                'field_name_short': s[2],
+                                                'ischeck': s[3],
+                                                'ischeck_package': s[4]
+                                                })   
+
+                                WindX['ClassWin'].ClassScrollableFrame.canvas.yview_moveto(0.0)                             
+                                
+                            WindX['win_login_done'] = True  
+                            UI_WinFontSet(force=True, mainWin=WindX['ClassWin'].root)                     
+                        else:
+                            UT_Print2Log('red', "No data in your wallet!")
+                            messagebox.showwarning(title='Warning', message="No data in your wallet!")
+                            WindX['ClassWin'].frame222.grid()
+                            WindX['ClassWin'].root.update()
                     else:
-                        UT_Print2Log('red', "No data in your wallet!")
-                        messagebox.showwarning(title='Warning', message="No data in your wallet!")
+                        messagebox.showwarning(title='Warning!', message="!!! The file may not be correct, or the Encrypt Code may not be correct to decrypt this file:\n" + filename)
                 except:
                     UT_Print2Log('red', sys._getframe().f_lineno, traceback.format_exc())
+
+            try:
+                WindX['ClassWin'].button_files.grid()
+                WindX['ClassWin'].label_delay2send.grid()
+                WindX['ClassWin'].widget_delay2send.grid()
+                WindX['ClassWin'].ClassScrollableFrame_files.grid_remove()
+                WindX['ClassWin'].frame2211.grid_remove()
+                WindX['ClassWin'].button_config.config(text='Config ∨')
+                WindX['ClassWin'].configurations_show_on = False
+                WindX['ClassWin'].frame222.grid()
+                WindX['ClassWin'].root.update()
+
+                t4 = threading.Timer(0.5, WindX['ClassWin'].ClassScrollableFrame.canvasLeave)
+                t4.start() 
+            except:
+                UT_Print2Log('red', sys._getframe().f_lineno, traceback.format_exc())
 
         elif act == 'new':
             para = {
@@ -456,8 +516,8 @@ def PSWaction(row=0,act=None,filename=None,delstr=False):
             WindX['ClassWin'].UIaddNewRow(WindX['ClassWin'].frame221, para, True)
             UI_WinFontSet(force=True, mainWin=WindX['ClassWin'].root)
             WindX['ClassWin'].root.update()
-            t4 = threading.Timer(0.5, WindX['ClassWin'].ClassScrollableFrame.canvasLeave)
-            t4.start()
+            t4 = threading.Timer(0.5, WindX['ClassWin'].ClassScrollableFrame.canvasLeave, args=[None, 'both', "add-new-row"])
+            t4.start()            
 
         elif act == 'Anchor':
             UI_WinGeometry(WindX['ClassWin'].root, '+0+0')
@@ -503,7 +563,7 @@ def KeyInputCheck(event,e=None):
 def CodeInputCheck():
     yes = 1
     try:
-        WindX['EncryptCode'] = WindX['ClassWin'].var_EncryptCode.get()       
+        WindX['EncryptCode'] = re.sub(r'^\s+|\s+$', '', WindX['ClassWin'].var_EncryptCode.get())       
         if not WindX['EncryptCode']:
             yes = 0
             WindX['ClassWin'].widget_EncryptCode.configure(background='#FFFF66')
@@ -548,6 +608,8 @@ def DeviceDisplaysInfo():
         WindX['ClassWin'].root.update()
         WindX['win_orig_width'] = WindX['ClassWin'].root.winfo_width() 
     print("WindX['win_orig_width']=", WindX['win_orig_width'])
+
+    WindX['ClassWin'].label_tmp_status.config(text="please input [Encrypt Code], then hit [Enter] key to load your data")
 
     t5 = threading.Timer(2,AlertSchedule)
     t5.start()
@@ -668,21 +730,6 @@ def ForeGroundWindow():
                     UI_WinFontSet(mainWin=WindX['ClassWin'].root)
                 return
             WindX['FGW'][1] = [fgwHandle, title]
-
-            '''
-            if len(WindX['FGW'][1]) == 0:
-                WindX['FGW'][1] = [fgwHandle, win32gui.GetWindowText(fgwHandle)]
-                #UT_Print2Log('', "FGW", WindX['FGW'])
-
-            elif len(WindX['FGW'][2]) == 0:
-                WindX['FGW'][2] = [fgwHandle, win32gui.GetWindowText(fgwHandle)]
-                #UT_Print2Log('', "FGW", WindX['FGW'])
-
-            elif not (fgwHandle == WindX['FGW'][2][0]):
-                WindX['FGW'][1] = WindX['FGW'][2]
-                WindX['FGW'][2] = [fgwHandle, win32gui.GetWindowText(fgwHandle)]
-                #UT_Print2Log('', "FGW", WindX['FGW'])
-            '''
     except:
         UT_Print2Log('red', sys._getframe().f_lineno, traceback.format_exc()) 
 
@@ -709,6 +756,7 @@ class ClassWinTkBase():
         self.label_tmp_status = None
         self.form22_rows = 0
         self.form21_colnums = 1
+        self.files_display_path = ""
 
         self.UI()
 
@@ -734,7 +782,7 @@ class ClassWinTkBase():
         self.frame1.grid(row=0,column=0,sticky=E+W+S+N,pady=0,padx=0)
         self.frame1.bind('<Motion>', self.MotionFrame1)
 
-        self.frame2 = Frame(self.root,bg='#E0E0E0')
+        self.frame2 = Frame(self.root,bg='#C0C0C0')
         self.frame2.grid(row=1,column=0,sticky=E+W+S+N,pady=0,padx=0)
         self.frame2.grid_columnconfigure(0, weight=1)
         self.frame2.grid_rowconfigure(1, weight=1)
@@ -743,15 +791,23 @@ class ClassWinTkBase():
         self.frame21.grid(row=0,column=0,sticky=E+W+S+N,pady=0,padx=0)
 
         self.frame22 = Frame(self.frame2,bg='#E0E0E0')
-        self.frame22.grid(row=1,column=0,sticky=E+W+S+N,pady=0,padx=0)  
+        self.frame22.grid(row=1,column=0,sticky=E+W+S+N,pady=1,padx=0)  
         self.frame22.grid_columnconfigure(0, weight=1)
 
         self.frame221x = Frame(self.frame22,bg='#E0E0E0')
-        self.frame221x.grid(row=0,column=0,sticky=E+W+S+N,pady=0,padx=0)
+        self.frame221x.grid(row=1,column=0,sticky=E+W+S+N,pady=0,padx=0)
 
-        self.frame2211_bg = '#E8E8E8'
-        self.frame2211 = Frame(self.frame221x,bg=self.frame2211_bg)
-        self.frame2211.grid(row=0,column=0,sticky=E+W+S+N,pady=1,padx=0)
+        self.frame2211_bg = '#C5C5C5'
+        self.frame2211 = Frame(self.frame221x,bg= self.frame2211_bg)
+        self.frame2211.grid(row=0,column=0,sticky=E+W+S+N,pady=0,padx=0)
+
+        self.file_list_button_bg = "#E8E8E8"
+        self.ClassScrollableFrame_files = ClassScrollableFrame(self.frame221x)   #WindX['Frame1X']
+        self.frame221_files = self.ClassScrollableFrame_files.scrollable_frame         #WindX['Frame1']
+        self.ClassScrollableFrame_files.grid(row=1,column=0,sticky=E+W+S+N,pady=0,padx=0)
+        self.root.bind("<MouseWheel>",  self.ClassScrollableFrame_files.canvasMouseWheel)
+        self.ClassScrollableFrame_files.grid_remove()
+        self.ClassScrollableFrame_files_show = False
 
         self.ClassScrollableFrame = ClassScrollableFrame(self.frame221x)   #WindX['Frame1X']
         self.frame221 = self.ClassScrollableFrame.scrollable_frame         #WindX['Frame1']
@@ -759,7 +815,7 @@ class ClassWinTkBase():
         self.root.bind("<MouseWheel>",  self.ClassScrollableFrame.canvasMouseWheel)
 
         self.frame222 = Frame(self.frame22,bg='#E0E0E0')
-        self.frame222.grid(row=1,column=0,sticky=E+W+S+N,pady=0,padx=0)
+        self.frame222.grid(row=0,column=0,sticky=E+W+S+N,pady=0,padx=0)
 
         #- root
         #-- frame1
@@ -769,7 +825,7 @@ class ClassWinTkBase():
         #--------- frame221x: 
         #------------- frame2211: Encrypt / Decrypt Code, 
         #------------- frame221 : data list
-        #--------- frame222: Open, Save, New, Anchor, Auto
+        #--------- frame222: Open, Save, New, Anchor, Auto, Files
 
         if self.frame21:
             b=ClassButtonGrid(self.frame21,0,0, self.Frame2Hide,'⇡',msg='Collapse Window', width=4)
@@ -779,23 +835,23 @@ class ClassWinTkBase():
             b = ClassButtonGrid(self.frame21,0,1,self.Frame22Show, self.frame21_buttonShowFrame22Text, width=4)
             self.frame21_buttonShowFrame = b.b
 
-            xlbl = Label(self.frame21, text='please input [Code], then hit [Enter] key to load your data ...', justify=CENTER, relief=FLAT,pady=3,padx=3, bg='yellow')
-            xlbl.grid(row=0,column=0,columnspan=3, sticky=E+W)
-            self.label_tmp_status = xlbl
-
-            bs = ClassButtonGrid(self.frame21,0,1000,Wind_Align_Browsers,'A.B',p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',0,E+W+N+S,1,1])
+            bs = ClassButtonGrid(self.frame21,0,1000, Wind_Align_Browsers,'A.B',p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',0,E+W+N+S,1,1])
             UI_WidgetBalloon(bs.b,  'Align browser windows')
+
+            xlbl = Label(self.frame21, text='initiating ... ... please wait for seconds!', justify=CENTER, relief=FLAT,pady=3,padx=3, bg='yellow')
+            xlbl.grid(row=0,column=0,columnspan=1005, sticky=E+W+N+S)
+            self.label_tmp_status = xlbl
 
         if self.frame2211:
             row = 0  
             col = 0
-            Label(self.frame2211, text='Code', justify=CENTER, relief=FLAT,pady=5,padx=5, bg=self.frame2211_bg).grid(row=row,column=col,sticky=E+W)
+            Label(self.frame2211, text='Encrypt Code', justify=CENTER, relief=FLAT,pady=5,padx=5, bg=self.frame2211_bg).grid(row=row,column=col,sticky=E+W)
             self.var_EncryptCode = StringVar()
             
             col+=1
             e=Entry(self.frame2211, justify=LEFT, relief=FLAT, textvariable=self.var_EncryptCode, show="*")
             e.grid(row=row,column=col,sticky=E+W+N+S,pady=1,padx=1)
-            e.insert(0,WindX['EncryptCode'])
+            e.insert(0, WindX['EncryptCode'])
             e.bind('<FocusIn>',func=UT_HandlerAdaptor(KeyInputCheck,e=e))
             e.bind('<KeyRelease>',func=UT_HandlerAdaptor(KeyInputCheck,e=e))
             e.bind('<Leave>',func=UT_HandlerAdaptor(UI_WidgetEntryShow,e=e,ishow='*'))
@@ -804,7 +860,8 @@ class ClassWinTkBase():
             UI_WidgetBalloon(e,  'Code to encrypt or decrypt your data')
 
             col+=1
-            Label(self.frame2211, text='Delay', justify=CENTER, relief=FLAT,pady=5,padx=5, bg=self.frame2211_bg).grid(row=row,column=col,sticky=E+W)
+            self.label_delay2send = Label(self.frame2211, text='Delay to send', justify=CENTER, relief=FLAT,pady=5,padx=5, bg=self.frame2211_bg)
+            self.label_delay2send.grid(row=row,column=col,sticky=E+W)
             
             col+=1
             self.var_delay2send = StringVar()
@@ -814,37 +871,287 @@ class ClassWinTkBase():
             self.widget_delay2send = e2
             UI_WidgetBalloon(e2,  'Delay to send, seconds after click')
 
-            col+=1
-            self.frame2211.grid_columnconfigure(col, weight=1)
-            xlbl = Label(self.frame2211, text='0', justify=RIGHT, relief=FLAT,pady=5,padx=3, bg=self.frame2211_bg, fg='#A0A0A0', anchor=E)
-            xlbl.grid(row=row,column=col,sticky=E+W,pady=1,padx=5)
-            self.widget_label_next_rest = xlbl
-            UI_WidgetBalloon(xlbl,  'Seconds to have a break')
+            self.label_delay2send.grid_remove()
+            self.widget_delay2send.grid_remove()
 
         if self.frame222:
+            self.buttons_frame222_bg = '#D0D0D0'
+            iwidth = 8
+
             row = 0 
-            col = 0
-            ClassButtonGrid(self.frame222,row,col,lambda:PSWaction(0,"get"),'Open', width=10)
+            col = 0     
+            self.var_Click_Watcher = IntVar()
+            ef_chkb = Checkbutton(self.frame222, text= "Auto", variable= self.var_Click_Watcher, justify=LEFT, fg='blue', bg=self.buttons_frame222_bg, relief=FLAT, width=iwidth)
+            ef_chkb.grid(row=row,column=col,sticky=E+W+N+S,padx=0,pady=0)
+            UI_WidgetBalloon(ef_chkb,  '-- Auto check (and show OCR result) on the click-area.\n-- While pressing [Alt] key then copy OCR result to clipboard.\n-- Click middle-mouse to trigger this watcher once.', 'Mouse-click Watcher')
+            #self.var_Click_Watcher.set(1)  
+            
+            self.buttons_frame222 = {}
+            col+=1
+            b = ClassButtonGrid(self.frame222,row,col,lambda:PSWaction(0,"get"),'Open', width=iwidth, bg=self.buttons_frame222_bg)
+            self.buttons_frame222['Open'] = b.b
             
             col+=1
-            ClassButtonGrid(self.frame222,row,col,lambda:PSWaction(0,"save"),'Save', width=10)    
+            b = ClassButtonGrid(self.frame222,row,col,lambda:PSWaction(0,"save"),'Save', width=iwidth, bg=self.buttons_frame222_bg)    
+            self.buttons_frame222['Save'] = b.b
 
             col+=1
-            b = ClassButtonGrid(self.frame222,row,col,lambda:PSWaction(0,"new"),'New', width=10)  
+            b = ClassButtonGrid(self.frame222,row,col,lambda:PSWaction(0,"new"),'New', width=iwidth, bg=self.buttons_frame222_bg)  
+            self.buttons_frame222['New'] = b.b
             UI_WidgetBalloon(b.b,  'Add new row')
 
             col+=1
-            b = ClassButtonGrid(self.frame222,row,col,lambda:PSWaction(0,"Anchor"),'⇱', width=10)  
+            b = ClassButtonGrid(self.frame222,row,col, self.configurations_show,'Config ∧', width=iwidth, bg=self.buttons_frame222_bg)  
+            UI_WidgetBalloon(b.b,  'Show/hide configurations')
+            self.button_config = b.b
+            self.configurations_show_on = True
+
+            col+=1
+            b = ClassButtonGrid(self.frame222,row,col,lambda:PSWaction(0,"Anchor"),'⇱', width=iwidth, bg=self.buttons_frame222_bg)  
+            self.buttons_frame222['Anchor'] = b.b
             UI_WidgetBalloon(b.b,  'Anchor at the point (0,0)')
 
             col+=1
-            self.var_Click_Watcher = IntVar()
-            ef_chkb = Checkbutton(self.frame222, text= "Auto", variable= self.var_Click_Watcher, justify=LEFT, fg='blue', bg='#E0E0E0', relief=FLAT, width=10)
-            ef_chkb.grid(row=row,column=col,sticky=E+W+N+S,padx=0,pady=0)
-            UI_WidgetBalloon(ef_chkb,  '-- Auto check (and show OCR result) on the click-area.\n-- While pressing [Alt] key then copy OCR result to clipboard.\n-- Click middle-mouse to trigger this watcher once.', 'Mouse-click Watcher')
-            #self.var_Click_Watcher.set(1)         
+            b = ClassButtonGrid(self.frame222,row,col, self.files_list_show,'List', width=iwidth, bg=self.file_list_button_bg, fg='#8B2500')  
+            UI_WidgetBalloon(b.b,  'Manage my encrypted files/list')
+            self.button_files = b.b
+            b.b.grid_remove()                   
+
+            col+=1
+            self.frame222.grid_columnconfigure(col, weight=1)
+            xlbl = Label(self.frame222, text='0', justify=RIGHT, relief=FLAT,pady=5,padx=3, bg=self.file_list_button_bg, fg='#A0A0A0', anchor=E)
+            xlbl.grid(row=row,column=col,sticky=E+W+N+S,pady=0,padx=0)
+            self.widget_label_next_rest = xlbl
+            UI_WidgetBalloon(xlbl,  'Seconds to have a break')
+
+        self.frame222.grid_remove()
+
+        if self.frame221_files:            
+            self.frame221_files_01 = Frame(self.frame221_files, bg='#EFEFEF')
+            self.frame221_files_01.grid(row=0,column=0,sticky=E+W+S+N,pady=1,padx=0)
+
+            self.frame221_files_02 = Frame(self.frame221_files, bg='#EFEFEF')
+            self.frame221_files_02.grid(row=1,column=0,sticky=E+W+S+N,pady=0,padx=0)
+
+            Label(self.frame221_files_01, text='Folder', justify=LEFT, relief=FLAT,pady=5,padx=5, bg=self.file_list_button_bg, anchor=E).grid(row=0,column=0,sticky=E+W+S+N,pady=0,padx=0)
+            self.files_folder_path = StringVar()
+            e=Entry(self.frame221_files_01, justify=LEFT, relief=FLAT, textvariable= self.files_folder_path, state='readonly')
+            e.grid(row=0,column=1,sticky=E+W+N+S,pady=0,padx=1)
+
+            b= ClassButtonGrid(self.frame221_files_01,0,2, self.select_folder, '...' ,fg='blue', bg= self.file_list_button_bg, p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',10,E+W+N+S,0,0]) 
+            UI_WidgetBalloon(b.b, 'Select Folder')
+
+            b= ClassButtonGrid(self.frame221_files_01,0,3, self.files_display_list, '↻' ,fg='blue', bg= self.file_list_button_bg, p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',10,E+W+N+S,0,0]) 
+            UI_WidgetBalloon(b.b, 'Refresh file list')
+
+            self.frame221_files.grid_columnconfigure(0, weight=1)
+            self.frame221_files_01.grid_columnconfigure(1, weight=1)
 
         #self.root.mainloop()
+
+    def configurations_show(self):
+        if self.configurations_show_on:
+            self.configurations_show_on = False
+            self.button_config.config(text='Config ∨')
+            self.frame2211.grid_remove()
+        else:
+            self.configurations_show_on = True
+            self.button_config.config(text='Config ∧')
+            self.frame2211.grid()
+
+            if self.ClassScrollableFrame_files_show:
+                t2 = threading.Timer(0.5, self.ClassScrollableFrame_files.canvasLeave)
+                t2.start()
+            else:
+                t1 = threading.Timer(0.5, self.ClassScrollableFrame.canvasLeave)
+                t1.start()
+
+    def select_folder(self):
+        dir_path = UI_SetFolder(WindX['self_folder'])
+        if dir_path:
+            self.files_display_path = dir_path
+            self.files_folder_path.set(dir_path)
+            self.files_display_list()
+
+    def files_display_list(self):
+        if self.files_display_path and os.path.exists(self.files_display_path):
+            UI_WinWidgetRemove(wid=self.frame221_files_02)
+            self.files_display_buttons = {}
+            
+            n = 0
+            try:
+                #get all files in his folder
+                os.chdir(self.files_display_path)
+                lbl = Label(self.frame221_files_02, text='No.', justify=LEFT, relief=FLAT,pady=5,padx=3, bg=self.file_list_button_bg, anchor=E)
+                lbl.grid(row=n,column=0,sticky=E+W+S+N,pady=1,padx=0)
+
+                lbl = Label(self.frame221_files_02, text='Status', justify=LEFT, relief=FLAT,pady=5,padx=3, bg=self.file_list_button_bg, anchor=E)
+                lbl.grid(row=n,column=1,sticky=E+W+S+N,pady=1,padx=1)
+
+                lbl = Label(self.frame221_files_02, text='File Name', justify=CENTER, relief=FLAT,pady=5,padx=3, bg=self.file_list_button_bg, anchor='w', width=40)
+                lbl.grid(row=n,column=2,sticky=E+W+S+N,pady=1,padx=0)
+
+                lbl = Label(self.frame221_files_02, text='File Size (Kbs)', justify=LEFT, relief=FLAT,pady=5,padx=3, bg=self.file_list_button_bg, anchor='w')
+                lbl.grid(row=n,column=3,sticky=E+W+S+N,pady=1,padx=1)
+
+                lbl = Label(self.frame221_files_02, text='Last Modified', justify=LEFT, relief=FLAT,pady=5,padx=3, bg=self.file_list_button_bg, anchor='w')
+                lbl.grid(row=n,column=4,sticky=E+W+S+N,pady=1,padx=0)    
+                
+                for f in sorted(glob.glob("*")): 
+                    if (f == '.') or (f == '..'):
+                        continue
+                            
+                    if not os.path.isdir(os.path.join(self.files_display_path, f)):
+                        n += 1
+                        try:
+                            fid = UT_GetMD5(f)
+
+                            ipay = 0
+                            if n%2==0:
+                                ipay = 1
+
+                            tips = "Click to encrypt the file: "
+                            status = ''
+                            #if re.match(r'.*(\.[A-Z0-9]{4}\.crpt)$', f, re.I):
+                            if re.match(r'.*\.crpt$', f, re.I):
+                                status = 'lock'
+                                tips = "Click to decrypt the file: "
+
+                            fsize = round(os.path.getsize(f)/1024, 2)   #when the file path is deep and every long, will get error and fail to get file size
+                            ftime = time.strftime("%y-%m-%d %H:%M:%S",time.localtime(os.path.getmtime(f)))
+
+                            lbl = Label(self.frame221_files_02, text=str(n), justify=LEFT, relief=FLAT,pady=5,padx=3, bg=self.file_list_button_bg, anchor=E)
+                            lbl.grid(row=n,column=0,sticky=E+W+S+N,pady=ipay,padx=0)
+                            lbl.bind("<MouseWheel>",  self.ClassScrollableFrame_files.canvasMouseWheel)
+
+                            lb2 = Label(self.frame221_files_02, text=status, justify=CENTER, relief=FLAT,pady=5,padx=3, bg=self.file_list_button_bg, fg='red')
+                            lb2.grid(row=n,column=1,sticky=E+W+S+N,pady=ipay,padx=1)
+                            lb2.bind("<MouseWheel>",  self.ClassScrollableFrame_files.canvasMouseWheel)
+
+                            #b= ClassButtonGrid(self.frame221_files_02, n, 2, lambda:self.files_encrypt_decrypt(f), f ,fg='blue', bg= self.file_list_button_bg, TexAnchor='w' ,p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',10,E+W+N+S,ipay,0])  
+                            #b.b.bind("<MouseWheel>",  self.ClassScrollableFrame_files.canvasMouseWheel)
+                            #UI_WidgetBalloon(b.b, tips + f)
+                            #self.files_display_buttons[UT_GetMD5(f)] = [b.b, n, 2]
+                            b3 = self.files_list_add_rows(n, f, tips, ipay, fid)
+
+                            lb4 = Label(self.frame221_files_02, text=str(fsize), justify=LEFT, relief=FLAT,pady=5,padx=3, bg=self.file_list_button_bg, anchor='w')
+                            lb4.grid(row=n,column=3,sticky=E+W+S+N,pady=ipay,padx=1)
+                            lb4.bind("<MouseWheel>",  self.ClassScrollableFrame_files.canvasMouseWheel)
+
+                            lb5 = Label(self.frame221_files_02, text=ftime, justify=LEFT, relief=FLAT,pady=5,padx=3, bg=self.file_list_button_bg, anchor='w')
+                            lb5.grid(row=n,column=4,sticky=E+W+S+N,pady=ipay,padx=0)    
+                            lb5.bind("<MouseWheel>",  self.ClassScrollableFrame_files.canvasMouseWheel)
+
+                            self.files_display_buttons[fid] = [n, 2, lb2, b3, lb4, lb5, ipay] 
+                        except:
+                            UT_Print2Log('red', sys._getframe().f_lineno, traceback.format_exc())                    
+            
+            except:
+                UT_Print2Log('red', sys._getframe().f_lineno, traceback.format_exc())
+
+            t2 = threading.Timer(1, self.ClassScrollableFrame_files.canvasLeave)
+            t2.start()
+
+    def files_list_add_rows(self, n, f, tips, ipay, fid):
+        b= ClassButtonGrid(self.frame221_files_02, n, 2, lambda:self.files_encrypt_decrypt(f), f ,fg='blue', bg= self.file_list_button_bg, TexAnchor='w' ,p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',10,E+W+N+S,ipay,0])  
+        b.b.bind("<MouseWheel>",  self.ClassScrollableFrame_files.canvasMouseWheel)
+        UI_WidgetBalloon(b.b, tips + f)
+        return b.b      
+        
+    def files_encrypt_decrypt(self, file=""):
+        try:
+            file_dir = self.files_folder_path.get()
+            filepath = os.path.join(file_dir, file)
+            print("\nfiles_encrypt_decrypt:", file_dir, file)
+            if os.path.exists(filepath):
+                os.chdir(file_dir)
+                EncryptCode = re.sub(r'^\s+|\s+$', '', self.var_EncryptCode.get())
+                #VerifyCode = UT_MD5_VerifyCode(EncryptCode)
+
+                to_encrypt = True  
+                #filex = file + '.' + VerifyCode + '.crpt'  
+                filex = file + '.crpt'  
+                status = 'lock'
+                tips = "Click to decrypt the file: "        
+                if re.match(r'.*\.crpt$', file, re.I):
+                #if re.match(r'.*(\.[A-Z0-9]{4}\.crpt)$', file, re.I):
+                    #if not re.match(r'.*(\.{}\.crpt)$'.format(VerifyCode), file, re.I):
+                    #    messagebox.showwarning(title='Warning!', message="!!! Encrypt Code is not correct to decrypt this file:\n" + file)
+                    #    return
+
+                    to_encrypt = False
+                    #filex = re.sub(r'(\.[A-Z0-9]{4}\.crpt)$', '', file, flags=re.I)
+                    filex = re.sub(r'\.crpt$', '', file, flags=re.I)
+                    tips = "Click to encrypt the file: "
+                    status = ''
+
+                print("\tfile to_encrypt=", to_encrypt, filex)
+
+                fdata  = UT_FileOpen(file, format='bytes')
+                ffdata = UT_CryptMe(fdata, key=UT_GetMD5(EncryptCode), isEncript=to_encrypt, dataType='bytes')
+
+                if ffdata:
+                    UT_FileSave(ffdata, filex, format='bytes')
+                    if os.path.exists(filex):
+                        #self.files_display_list()
+                        #return
+                    
+                        fsize = round(os.path.getsize(filex)/1024, 2)   #when the file path is deep and every long, will get error and fail to get file size            
+                        ftime = time.strftime("%y-%m-%d %H:%M:%S",time.localtime(os.path.getmtime(filex)))
+
+                        oid = UT_GetMD5(file)
+                        wids = self.files_display_buttons[oid]   #[row, col, lb2, b3, lb4, lb5, ipay]
+                        row  = wids[0]
+                        ipay = wids[6]
+                        self.files_display_buttons[oid][3].destroy()
+
+                        nid = UT_GetMD5(filex)
+                        b3  = self.files_list_add_rows(row, filex, tips, ipay, nid)            
+                        self.files_display_buttons[nid] = wids
+                        self.files_display_buttons[nid][3] = b3
+                        self.files_display_buttons[nid][2].config(text = status)
+                        self.files_display_buttons[nid][4].config(text = fsize)
+                        self.files_display_buttons[nid][5].config(text = ftime)
+
+                        del self.files_display_buttons[oid]
+                        UT_FileDelete(file)
+
+                    else:
+                        UT_Print2Log('red', "\n", sys._getframe().f_lineno, "failed to encrypt/decrypt:", filepath)
+                else:
+                    if re.match(r'.*\.crpt$', file, re.I):
+                        messagebox.showwarning(title='Warning!', message="!!! Encrypt Code may not be correct to decrypt this file:\n" + file)
+                    else:
+                        messagebox.showwarning(title='Warning!', message="!!! Encrypt Code my not be not correct to encrypt this file:\n" + file)
+
+            else:
+                UT_Print2Log('red', "\n", sys._getframe().f_lineno, "File not existing to encrypt/decrypt:", filepath)
+        except:
+            UT_Print2Log('red', sys._getframe().f_lineno, traceback.format_exc())
+
+    def files_list_show(self):
+        if self.ClassScrollableFrame_files_show:
+            self.ClassScrollableFrame_files.grid_remove()
+            self.ClassScrollableFrame.grid()
+            self.ClassScrollableFrame_files_show = False
+            self.button_files.config(text='List')
+
+            for b in self.buttons_frame222.keys():
+                self.buttons_frame222[b].config(state='normal')
+
+            t4 = threading.Timer(0.5, self.ClassScrollableFrame.canvasLeave)
+            t4.start()
+        else:
+            self.ClassScrollableFrame.grid_remove()
+            self.ClassScrollableFrame_files.grid()
+            self.ClassScrollableFrame_files_show = True
+            self.button_files.config(text='Files')
+
+            for b in self.buttons_frame222.keys():
+                self.buttons_frame222[b].config(state='disabled')
+
+            t4 = threading.Timer(0.5, self.ClassScrollableFrame_files.canvasLeave)
+            t4.start()
 
     def WinOnMotion(self, event=None):
         self.WinOnMotion_LastTime = time.time()
@@ -937,11 +1244,11 @@ class ClassWinTkBase():
         pady_row = 0
         if self.form22_rows % 2:
             pady_row = 1
-        
+
         ef_chkbx = ClassCheckboxGrid(
             form,self.form22_rows, col, None, self.form22_rows - 1,
             fg='#009900',
-            bg='#EFEFEF', 
+            bg= self.file_list_button_bg, 
             p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',0,E+W+N+S,pady_row, self.ColumnPadx(col)], 
             isList=True,
             msg = 'Checked to show on the toolbar',
@@ -991,7 +1298,7 @@ class ClassWinTkBase():
         col +=1
         ef_chkb_ext = ClassCheckboxGrid(
             form,self.form22_rows, col, lambda:ExtensionCheck(row), '',
-            bg='#EFEFEF', 
+            bg= self.file_list_button_bg, 
             p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',0,E+W+N+S,pady_row,self.ColumnPadx(col)], 
             isList=True,
             msg = 'Checked to be executed as an extension',
@@ -1013,7 +1320,7 @@ class ClassWinTkBase():
         col +=1
         bcopy = ClassButtonGrid(
             form,self.form22_rows, col, lambda:PSWaction(row,"copy"),texttips['copy'][0], 
-            bg='#EFEFEF', 
+            bg= self.file_list_button_bg, 
             p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',8,E+W+N+S,pady_row,self.ColumnPadx(col)], 
             isList=True,
             msg = texttips['copy'][1]
@@ -1022,7 +1329,7 @@ class ClassWinTkBase():
         col +=1
         bsend = ClassButtonGrid(
             form,self.form22_rows,col,lambda:PSWaction(row,"send"), texttips['send'][0], 
-            bg='#EFEFEF', 
+            bg= self.file_list_button_bg, 
             p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',8,E+W+N+S,pady_row,self.ColumnPadx(col)], 
             isList=True,
             msg = texttips['send'][1]
@@ -1032,7 +1339,7 @@ class ClassWinTkBase():
         bdelete = ClassButtonGrid(
             form,self.form22_rows,col,lambda:PSWaction(row,"delete"),'x',
             fg='red', 
-            bg='#EFEFEF' ,
+            bg= self.file_list_button_bg,
             p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',3,E+W+N+S,pady_row,self.ColumnPadx(col)], 
             isList=True,
             msg = 'Delete this row'
@@ -1054,6 +1361,7 @@ class ClassWinTkBase():
 
             bs = ClassButtonGrid(
                 self.frame21,0,self.form21_colnums,lambda:PSWaction(row,"send"), shortname,
+                bg = self.file_list_button_bg,
                 p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',0,E+W+N+S,1,1],
                 msg = para['field_name']
                 )
@@ -1551,10 +1859,13 @@ class ClassButtonGrid:
 class ClassScrollableFrame(ttk.Frame):
     def __init__(self, container, *args, **kwargs):
         super().__init__(container, *args, **kwargs)
+        print("\nClassScrollableFrame, args=", args)
+        self.custom_bg = "#E8E8E8"
+
         self.canvas = Canvas(self, 
             width=500, 
             height=300,
-            bg="#EFEFEF",
+            bg= self.custom_bg, #"#EFEFEF",
             relief=FLAT,
             bd = 0,
         )
@@ -1564,7 +1875,7 @@ class ClassScrollableFrame(ttk.Frame):
         #self.scrollbar_x = ttk.Scrollbar(self, orient="horizontal", command=self.canvas.xview)
 
         gui_style = ttk.Style()
-        gui_style.configure('My.TFrame', background='#EFEFEF', padx=0, pady=0, relief=FLAT, bd=0)
+        gui_style.configure('My.TFrame', background= self.custom_bg, padx=0, pady=0, relief=FLAT, bd=0)  #background='#EFEFEF'
         self.scrollable_frame = ttk.Frame(self.canvas,style='My.TFrame')
 
         self.scrollable_frame.bind(
@@ -1605,7 +1916,9 @@ class ClassScrollableFrame(ttk.Frame):
         self.scrollbar_y.grid()
         self.scrollbar_y_show = True
 
-    def canvasLeave(self,e=None,fixSide='both'):
+    def canvasLeave(self, e=None, fixSide='both', action=""):
+        #print("\n----------\ncanvasLeave:", e, fixSide, action)
+        
         #fit frame22 to window size
 
         #- root
@@ -1712,6 +2025,7 @@ class ClassScrollableFrame(ttk.Frame):
                     return
 
             #2. check height
+            win_height_max = 0.6
             if fixSide == 'both' or fixSide == 'height':
                 caseText = ""
                 SceenH = MainH
@@ -1727,22 +2041,22 @@ class ClassScrollableFrame(ttk.Frame):
                 Fram21H = rectFram21[3] - rectFram21[1] 
 
                 rectFram2211 = UI_WidgetRectGET(WindX['ClassWin'].frame2211)
-                Fram2211H = rectFram21[3] - rectFram21[1]
+                Fram2211H    = rectFram2211[3] - rectFram2211[1]
 
                 rectFram23 = UI_WidgetRectGET(WindX['ClassWin'].frame222)
                 Fram23H = rectFram23[3] - rectFram23[1] + Fram21H + Fram2211H
 
-                CanvHmax = int(SceenH*0.6) - Fram1H - Fram23H        
+                CanvHmax = int(SceenH*win_height_max) - Fram1H - Fram23H        
                 geo = re.split(r'x|\+', WindX['ClassWin'].root.geometry())
 
-                if (FramH + FramPadxy*2 >= CanvHmax*0.6 and MainH < int(SceenH*0.6)) or MainH > int(SceenH*0.6):
+                if (FramH + FramPadxy*2 >= CanvHmax*win_height_max and MainH < int(SceenH*win_height_max)) or MainH > int(SceenH*win_height_max):
                     print("win heigt #3 ->")         
-                    UI_WinGeometry(WindX['ClassWin'].root, p= geo[0] + 'x' + str(int(SceenH*0.6)) + '+' + str(geo[2]) + '+' + str(geo[3]))
+                    UI_WinGeometry(WindX['ClassWin'].root, p= geo[0] + 'x' + str(int(SceenH*win_height_max)) + '+' + str(geo[2]) + '+' + str(geo[3]))
                     rectMain = UI_WidgetRectGET(WindX['ClassWin'].root)
                     MainH = rectMain[3] - rectMain[1]
                 CanvCurA = MainH - Fram1H - Fram23H
 
-                if FramH + FramPadxy*2 > CanvH and (MainH < int(SceenH*0.6) or CanvH < CanvCurA) and (CanvH + Fram1H + Fram23H < int(SceenH*0.6)):
+                if FramH + FramPadxy*2 > CanvH and (MainH < int(SceenH*win_height_max) or CanvH < CanvCurA) and (CanvH + Fram1H + Fram23H < int(SceenH*win_height_max)):
                     CanvH = CanvCurA
                     self.canvas.configure(height= CanvH)
                     #UI_WinGeometry(WindX['ClassWin'].root, p= geo[0] + 'x' + str(MainH) + '+' + str(geo[2]) + '+' + str(geo[3]))
@@ -1788,6 +2102,9 @@ class ClassScrollableFrame(ttk.Frame):
             #self.scrollbar_y_show = False
             #self.scrollbar_y.grid_remove()
             #self.scrollbar_x.grid_remove()
+
+            if action == 'add-new-row':
+                self.canvas.yview_moveto(1.0)
         except:
             UT_Print2Log('red', sys._getframe().f_lineno, traceback.format_exc())
 

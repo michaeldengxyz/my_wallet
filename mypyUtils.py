@@ -268,7 +268,11 @@ def UT_IsStrMatched(s1,s2,confidence=0.95):
         return True
     else:
         return False
-    
+
+def UT_MD5_VerifyCode(instring):
+    my_md5 = UT_GetMD5(instring)
+    return my_md5[0] + my_md5[-1] + my_md5[int(len(my_md5)/2)] + my_md5[int(len(my_md5)/4)]
+
 def UT_GetMD5(instring):
     #GetMD5 
     return str(hashlib.md5(instring.encode(encoding='UTF-8',errors='strict')).hexdigest()).upper()
@@ -291,7 +295,7 @@ def UT_RandomKey(n=1):
             key += '-'  
     return key
 
-def UT_CryptMe(instring,key=None,isEncript=True):    
+def UT_CryptMe(instring,key=None,isEncript=True,dataType='str'):    
     #CryptMe    
     #fdata['string'] = 'ILOVEU'
     #fdata['key']    = 'DF11-FB15-B7B2-15AB-47B7-7AC4-C6F9-5EFE'
@@ -308,17 +312,22 @@ def UT_CryptMe(instring,key=None,isEncript=True):
     fdata['sizeZ']= 0
     fdata['rateC']= 'NA'
     fdata['key'] = key
-    fdata['data'] = ''
+    fdata['data'] = None
     try:
+        pdata = None
         if isEncript:
-            #UT_Print2Log('', "\n\t.. Encrypt ..."); 
-            fdata['data'] = zlib.compress(fdata['string'].encode(encoding='UTF-8',errors='ignore'))       
-            if(fdata['data']):         
+            #UT_Print2Log('', "\n\t.. Encrypt ...");             
+            if dataType=='str':
+                pdata = zlib.compress(fdata['string'].encode(encoding='UTF-8',errors='ignore')) 
+            else: #if dataType == 'bytes':
+                pdata = zlib.compress(fdata['string'])
+
+            if pdata:         
                 ckey = re.sub(r'-','',fdata['key']); 
                 #UT_Print2Log('', "\t\tEncrypted:\n\t\t-- KEY: "+ fdata['key']) 
 
-                cryptor = AES.new(ckey.encode('utf-8'),AES.MODE_CBC,str(ckey[0:16]).encode('utf-8'))                       
-                fdata['data'] = base64.b64encode(cryptor.encrypt(UT_PadText(fdata['data']))); 
+                cryptor = AES.new(ckey.encode('utf-8'),AES.MODE_CBC,str(ckey[0:16]).encode('utf-8'))
+                fdata['data'] = base64.b64encode(cryptor.encrypt(UT_PadText(pdata))); 
                 
                 #UT_Print2Log('', "\t\t-- KEYSIZE: "+str(len(ckey))+"\n\t\t-- BLOCKSIZE: "+str(AES.block_size)+"\n\t\t-- IV: "+ckey[0:16])
             
@@ -333,8 +342,11 @@ def UT_CryptMe(instring,key=None,isEncript=True):
             #UT_Print2Log('', "\n\t.. Decrypt ..."); 
             ckey = re.sub(r'-','',fdata['key']); 
             cryptor = AES.new(ckey.encode('utf-8'),AES.MODE_CBC,str(ckey[0:16]).encode('utf-8'))  
-            fdata['data'] = cryptor.decrypt(base64.b64decode(fdata['string'])); 
-            fdata['data'] = zlib.decompress(fdata['data']).decode(encoding='UTF-8',errors='ignore') 
+            pdata = cryptor.decrypt(base64.b64decode(fdata['string'])); 
+            if dataType=='str':
+                fdata['data'] = zlib.decompress(pdata).decode(encoding='UTF-8',errors='ignore')
+            else: #if dataType == 'bytes':
+                fdata['data'] = zlib.decompress(pdata)
     except:
         UT_Print2Log('red', sys._getframe().f_lineno, traceback.format_exc()) 
 
@@ -868,6 +880,11 @@ def UT_FileSave(data,filepath, format='bytes'):
     except:
         UT_Print2Log('red', sys._getframe().f_lineno, traceback.format_exc())    
 
+def UT_FileDelete(file):
+    if os.path.exists(file):
+        os.unlink(file)
+        return True
+    
 def UT_FolderCreate(folder):
     if not folder:
         return False
