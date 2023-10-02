@@ -28,3 +28,12 @@ Tab#2 Notes (TBD)
 
 ### Send Field Value
 <img src="/MyWallet_How-to-send.png" width=800 />
+
+## Encrypt / descrypt files
+<img src="/MyWallet_encrypt_decrypt_files.png" width=800 />
+
+
+# Revisions History
+7.0 initiation;
+8.0: add new functions to manage encrypted files;
+8.1: disable the functions to catch image to OCR when mouse click in the line#107-109.
