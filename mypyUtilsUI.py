@@ -5,14 +5,15 @@
 
 import time, sys, re
 import traceback
-from tkinter import Label, Toplevel, Canvas, Frame, Button, Tk, filedialog
+from tkinter import Label, Toplevel, Canvas, Frame, Button, filedialog
 from tkinter import CENTER,FLAT,E,W,N,S,TOP,LEFT,X,BOTH,RIGHT,Y,ARC
 import tkinter.font as tf
 
 from ttkwidgets.frames import Balloon, Tooltip
 import ctypes
 from screeninfo import get_monitors
-from mypyUtils import UT_Print2Log, UT_GetColors, UT_XYminMax, UT_ScreenShotXY
+from mypyUtils import UT_Print2Log, UT_GetColors, UT_XYminMax
+from mypyUtilsImage import UTI_ScreenShotXY
 import win32gui,win32con,win32api
 import threading
 
@@ -532,7 +533,7 @@ class UI_ClassSnapshotMask():
             #print('self.mouse_selected_box=', self.mouse_selected_box)
             self.MaskClose()
             time.sleep(0.1)
-            self.im_PIL,self.im_err = UT_ScreenShotXY(
+            self.im_PIL,self.im_err = UTI_ScreenShotXY(
                 width = self.mouse_selected_box[2] - self.mouse_selected_box[0],
                 height= self.mouse_selected_box[3] - self.mouse_selected_box[1],
                 xSrc  = self.mouse_selected_box[0],
@@ -644,7 +645,7 @@ class UI_ClassSnapshotMaskFullscreen():
             
             """
             time.sleep(0.1)
-            self.im_PIL,self.im_err = UT_ScreenShotXY(
+            self.im_PIL,self.im_err = UTI_ScreenShotXY(
                 width = self.mouse_selected_box[2] - self.mouse_selected_box[0],
                 height= self.mouse_selected_box[3] - self.mouse_selected_box[1],
                 xSrc  = self.mouse_selected_box[0],
@@ -790,7 +791,7 @@ class UI_ClassButtonPack:
 
 class UI_ClassButtonGrid:
     def __init__(self,frm,row=0,col=0,cmd=None,txt='?',fg='blue',bg='#E0E0E0',
-                    colspan=1, width = 0, msg=None,
+                    colspan=1, width = 0, msg=None, TexAnchor = CENTER,
                     p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',0,E+W+N+S,0,0]):
 
         if width:
@@ -801,6 +802,7 @@ class UI_ClassButtonGrid:
                     fg=fg,
                     bg=bg,
                     justify=p[0], 
+                    anchor= TexAnchor,
                     relief=p[1],
                     padx=p[2],
                     pady=p[3],                    

@@ -13,7 +13,7 @@ import time
 import win32gui, win32con, win32api
 import win32clipboard
 from win32api import GetMonitorInfo, MonitorFromPoint
-import win32ui
+
 import pynput
 from pynput import mouse
 import ctypes
@@ -29,8 +29,7 @@ import hashlib
 from Crypto.Cipher import AES
 import random
 import difflib
-from io import BytesIO
-from PIL import Image
+
 
 from colorama import init
 init(autoreset=True) #set this True to print color fonts in the console
@@ -96,69 +95,7 @@ def UT_UsedTime(stime, t=0):
 
     return tt['h'] + ':' + tt['m'] + ':' + tt['s'] 
 
-def UT_ImageFromBase64String(base64_str, image_path=None):
-    #base64_to_image
-    base64_data = re.sub('^data:image/.+;base64,', '', base64_str)
-    byte_data = base64.b64decode(base64_data)
-    image_data = BytesIO(byte_data)
-    img = Image.open(image_data)
-    if image_path:
-        img.save(image_path)
-    return img
 
-def UT_ScreenShotXY(width=0,height=0,xSrc=None,ySrc=None, debug=True):
-    #ScreenShotXY
-    stime = time.time()
-    im_PIL = None  
-    err = None
-    try:
-        if width == 0: 
-            return im_PIL,'width can not be 0!'
-        if height== 0:
-            return im_PIL,'height can not be 0!'
-
-        if xSrc == None:
-            return im_PIL,'x0 can not be None!'
-        if ySrc == None:
-            return im_PIL,'y0 can not be None!'
-        
-        hWnd = 0
-        hWndDC = win32gui.GetWindowDC(hWnd)   #0 - desktop
-        #创建设备描述表
-        mfcDC = win32ui.CreateDCFromHandle(hWndDC)
-        #创建内存设备描述表
-        saveDC = mfcDC.CreateCompatibleDC()
-        #创建位图对象准备保存图片
-        saveBitMap = win32ui.CreateBitmap()
-        #为bitmap开辟存储空间
-        #UT_Print2Log('', width,height,xSrc,ySrc,';',hWndDC,';',mfcDC) #-1920 1080 1920 1080 ; 889263399 ; object 'PyCDC' - assoc is 000001F1B3EC5998, vi=<None>
-        saveBitMap.CreateCompatibleBitmap(mfcDC,width,height)
-        #将截图保存到saveBitMap中
-        saveDC.SelectObject(saveBitMap)
-        #保存bitmap到内存设备描述表
-        saveDC.BitBlt((0,0), (width,height), mfcDC, (xSrc, ySrc), win32con.SRCCOPY)  
-        #BOOLBitBlt((int x,int y),(int nWidth,int nHeight),CDC*pSrcDC,(int xSrc,int ySrc),DWORDdwRop);
-        bmpinfo = saveBitMap.GetInfo()
-        bmpstr = saveBitMap.GetBitmapBits(True)
-        ###生成图像
-        im_PIL = Image.frombuffer('RGB',(bmpinfo['bmWidth'],bmpinfo['bmHeight']),bmpstr,'raw','BGRX',0,1)
-        #UT_Print2Log('', im_PIL)
-        win32gui.DeleteObject(saveBitMap.GetHandle())
-        saveDC.DeleteDC()
-        mfcDC.DeleteDC()
-        win32gui.ReleaseDC(hWnd,hWndDC)
-    except:
-        UT_Print2Log('red', sys._getframe().f_lineno, 'UT_ScreenShotXY [width, height, x0, y0]=',[width, height, xSrc, ySrc], traceback.format_exc())
-    #'''
-    if debug:
-        UT_Print2Log('blue',"UT_ScreenShotXY - used time:", UT_UsedTime(stime)) 
-
-        if isinstance(im_PIL, Image.Image):
-            UT_Print2Log('blue',"UT_ScreenShotXY - Image size: %s, mode: %s" % (im_PIL.size, im_PIL.mode))                    
-        else:
-            UT_Print2Log('red', sys._getframe().f_lineno, "Failed to get screenshot!")
-        #'''
-    return im_PIL,err
 
 def UT_GetColors(istart=16711680, n=10):
     colors = []
@@ -700,11 +637,29 @@ def UT_ClipboardInertText(text=""):
     try:
         win32clipboard.OpenClipboard()
         win32clipboard.EmptyClipboard()
+        win32clipboard.SetClipboardData(win32con.CF_UNICODETEXT, text)        
+        win32clipboard.CloseClipboard()
+
+        """
+        python 3.10.9
+        pywin32 302/305/306
+
         win32clipboard.SetClipboardData(win32con.CF_UNICODETEXT, text)
-        win32clipboard.CloseClipboard()
-    except:
-        win32clipboard.CloseClipboard()
-        UT_Print2Log('red', sys._getframe().f_lineno, traceback.format_exc())    
+        !!!! when text is number only, such as, 
+            ---- get error: pywintypes.error: (6, 'SetClipboardData', 'handle is invalid!'), when text='201920'
+            ---- or crash without error message, when text='18621312165'
+        !!!!
+        this bug is in pywin32 version > 301 
+        try to do: pip install pywin32==301
+
+        https://github.com/mhammond/pywin32/issues/2132
+        """
+    except:        
+        UT_Print2Log('red', sys._getframe().f_lineno, traceback.format_exc())  
+        try:
+            win32clipboard.CloseClipboard()
+        except:
+            UT_Print2Log('red', sys._getframe().f_lineno, traceback.format_exc())  
 
 def UT_ClipboardEmpty():
     if WinUtils['has_content_in_clipboard']:

@@ -13,9 +13,6 @@ pip install pynput
 pip install pycryptodome
 pip install screeninfo
 
-#https://blog.csdn.net/luanyongli/article/details/81385284
-#pip install pytesseract 
-
 #https://github.com/paddlepaddle/paddleocr
 #https://github.com/PaddlePaddle/PaddleOCR/blob/develop/doc/doc_ch/installation.md
 pip install paddlepaddle
@@ -40,6 +37,8 @@ import os,sys,glob
 #os.system('cls')
 
 #------------------------------
+print("\n\n#MW", sys._getframe().f_lineno, "sys.argv=", sys.argv, "\n")
+
 self_sys_argv0  = os.path.basename(sys.argv[0])
 self_folder = ""
 def find_real_file(ofile):
@@ -67,17 +66,23 @@ if not (self_folder and os.path.exists(self_folder + '/MyWallet.ini.json')):
 
 print("\n#MW", sys._getframe().f_lineno,"root:", self_folder, "\n")
 if not (self_folder and os.path.exists(self_folder + '/MyWallet.ini.json')):
+    print(sys._getframe().f_lineno, "File missing:", self_folder + '/MyWallet.ini.json')
     print(sys._getframe().f_lineno,"\n=========================== Failed to find root path!! ===========================\n")
     os._exit(0)
 sys.path.append(self_folder)
+
+is_to_load_paddle = False
+if len(sys.argv) > 1:
+    if len(sys.argv[1]) and re.sub(r'[^0-9]+', '', str(sys.argv[1])) == '1':
+        is_to_load_paddle = True
 #------------------------------
 
 from mypyUtilzip import UZ_Check
-UZ_Check(filename="mypyUtils",   fileExt='py')
-UZ_Check(filename="mypyUtilsUI", fileExt='py')
+UZ_Check(filename="mypyUtils",   fileExt='py', folder= self_folder)
+UZ_Check(filename="mypyUtilsUI", fileExt='py', folder= self_folder)
 
 import mypyUtilsUI
-from mypyUtils import *
+from mypyUtils   import *
 from mypyUtilsUI import *
 
 import win32gui
@@ -99,12 +104,9 @@ from multiprocessing import Process
 
 from ctypes import *
 
-WindX['load_times'].append([time.time(), 'app load modules: PIL module, ...'])
-from PIL import Image #,ImageDraw,ImageGrab,ImageTk,ImageFont,
-from io import BytesIO
-
-WindX['load_times'].append([time.time(), 'app load modules: paddleocr class ...']) 
-from image_ocr_class2 import PaddleOCR_Class, PaddleOCR_Load
+#if is_to_load_paddle:
+#    WindX['load_times'].append([time.time(), 'app load modules: ClassMouseClickWatcher class ...']) 
+#    from image_MouseClickWatcher_class import ClassMouseClickWatcher
 
 WindX['load_times'].append([time.time(), 'app load modules - end.'])
 WindXX = {}
@@ -112,7 +114,7 @@ WindX['self_folder'], WindX['pcName'], curUser = UT_GetInfoAppRoot()
 if not (self_folder == WindX['self_folder']):
     WindX['self_folder'] = self_folder
 
-WindX['self_folder_log'] = WindX['self_folder'] + '/MyWallet_Log'
+WindX['self_folder_log'] = os.path.join(WindX['self_folder'], 'MyWallet_Log')
 
 #### Global variables
 WindX['ClassWin'] = None
@@ -127,19 +129,21 @@ WindX['display_sizes'] = []
 WindX['keys_input_words'] = []
 WindX['win_start'] = 1
 
-WindX['win_ocr_used_time'] = {}
 WindX['win_ocr_PaddleOCR']  = None
+WindX['TopLevel_MessageAction'] = None
+WindX['win_ocr_used_time'] = {}
+WindX['keyboard_keyAltPress'] = False
+
 WindX['win_not_sending_key'] = 1
 WindX['keyboard_keyPress'] = []
-WindX['keyboard_keyAltPress'] = False
 
 WindX['row_shortname'] = {}
 WindX['mouse_last_time_click'] = [time.time(),0,0,0]
-WindX['TopLevel_MessageAction'] = None
+
 WindX['yscrollbar_oWidth'] = 0
 WindX['win_orig_width'] = 0
 
-WindX['configs_file'] = WindX['self_folder'] + "/MyWallet.ini.json"
+WindX['configs_file'] = os.path.join(WindX['self_folder'], "MyWallet.ini.json")
 WindX['mainPX'] = 0
 WindX['mainPY'] = 0
 WindX['UI_ToplevelAlertClass'] = None
@@ -159,7 +163,7 @@ UT_Print2Log('',"")
 def Revisons():
     WindX['main_rev_list'] ={
         '7.0': "initiation",
-        '8.0': "add new functions to manage encrypted files"
+        '8.0': "1) add new functions to manage encrypted files; 2) disable the functions to catch image to OCR when mouse click in the line#107-109."
     }
 
 def ConfigurationSave(): 
@@ -198,7 +202,7 @@ def WinFocusOn():
         UT_Print2Log('red', sys._getframe().f_lineno, ".... Can not catch ForegroundWindow!")
 
 def PSWaction(row=0,act=None,filename=None,delstr=False):
-    UT_Print2Log('', "\n",sys._getframe().f_lineno,"psw action", row,act)
+    UT_Print2Log('blue', "\n" + str(sys._getframe().f_lineno), "psw action", row, act)
     UI_WinWidgetState(wid=WindX['ClassWin'].root, state="disabled", widName="button")
     UI_WinWidgetState(wid=WindX['ClassWin'].root, state="disabled", widName="entry")
 
@@ -332,6 +336,8 @@ def PSWaction(row=0,act=None,filename=None,delstr=False):
                 UT_Print2Log('red',sys._getframe().f_lineno, traceback.format_exc())
 
         elif act == "copy":
+            #UT_Print2Log('blue', sys._getframe().f_lineno,"start:", row,act)
+
             if WindX['form_widgets'][row][11].get():
                 UI_WidgetEntryShow(None,e=WindX['form_widgets'][row][6],ishow='')
 
@@ -346,8 +352,10 @@ def PSWaction(row=0,act=None,filename=None,delstr=False):
                     WindX['form_widgets'][row][1].set(filename)
                     PSWaction_Done()           
                 return
-    
+
             kstr = str(WindX['form_widgets'][row][1].get())
+            if re.match(r'^\d+\.*\d*$', kstr):
+                UT_Print2Log('blue', sys._getframe().f_lineno,"copy number to clipboard: type=", type(kstr), ', len=', len(kstr))
             UT_ClipboardInertText(kstr)
 
         elif act == "delete":
@@ -534,6 +542,7 @@ def PSWaction_Done():
     UI_WinWidgetState(wid=WindX['ClassWin'].root, state="normal", widName="entry")
     WindX['win_not_sending_key'] = 1
     WindX['mouse_click_points'] = []
+    UT_Print2Log('blue', sys._getframe().f_lineno,"PSWaction_Done!")
 
 def Wind_Align_Browsers(): 
     ges = re.split(r'\+|x', WindX['ClassWin'].root.geometry())    
@@ -878,13 +887,15 @@ class ClassWinTkBase():
             self.buttons_frame222_bg = '#D0D0D0'
             iwidth = 8
 
-            row = 0 
+            row = 0
             col = 0     
             self.var_Click_Watcher = IntVar()
             ef_chkb = Checkbutton(self.frame222, text= "Auto", variable= self.var_Click_Watcher, justify=LEFT, fg='blue', bg=self.buttons_frame222_bg, relief=FLAT, width=iwidth)
             ef_chkb.grid(row=row,column=col,sticky=E+W+N+S,padx=0,pady=0)
             UI_WidgetBalloon(ef_chkb,  '-- Auto check (and show OCR result) on the click-area.\n-- While pressing [Alt] key then copy OCR result to clipboard.\n-- Click middle-mouse to trigger this watcher once.', 'Mouse-click Watcher')
             #self.var_Click_Watcher.set(1)  
+            if not is_to_load_paddle: 
+                ef_chkb.config(state='disabled')
             
             self.buttons_frame222 = {}
             col+=1
@@ -912,13 +923,13 @@ class ClassWinTkBase():
             UI_WidgetBalloon(b.b,  'Anchor at the point (0,0)')
 
             col+=1
+            self.frame222.grid_columnconfigure(col, weight=1)
             b = ClassButtonGrid(self.frame222,row,col, self.files_list_show,'List', width=iwidth, bg=self.file_list_button_bg, fg='#8B2500')  
             UI_WidgetBalloon(b.b,  'Manage my encrypted files/list')
             self.button_files = b.b
             b.b.grid_remove()                   
 
-            col+=1
-            self.frame222.grid_columnconfigure(col, weight=1)
+            col+=1            
             xlbl = Label(self.frame222, text='0', justify=RIGHT, relief=FLAT,pady=5,padx=3, bg=self.file_list_button_bg, fg='#A0A0A0', anchor=E)
             xlbl.grid(row=row,column=col,sticky=E+W+N+S,pady=0,padx=0)
             self.widget_label_next_rest = xlbl
@@ -938,11 +949,17 @@ class ClassWinTkBase():
             e=Entry(self.frame221_files_01, justify=LEFT, relief=FLAT, textvariable= self.files_folder_path, state='readonly')
             e.grid(row=0,column=1,sticky=E+W+N+S,pady=0,padx=1)
 
-            b= ClassButtonGrid(self.frame221_files_01,0,2, self.select_folder, '...' ,fg='blue', bg= self.file_list_button_bg, p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',10,E+W+N+S,0,0]) 
+            b= ClassButtonGrid(self.frame221_files_01,0,2, self.select_folder, '...' ,fg='blue', bg= self.file_list_button_bg, p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',iwidth,E+W+N+S,0,0]) 
             UI_WidgetBalloon(b.b, 'Select Folder')
 
-            b= ClassButtonGrid(self.frame221_files_01,0,3, self.files_display_list, '↻' ,fg='blue', bg= self.file_list_button_bg, p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',10,E+W+N+S,0,0]) 
+            b= ClassButtonGrid(self.frame221_files_01,0,3, self.files_display_list, '↻' ,fg='blue', bg= self.file_list_button_bg, p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',iwidth,E+W+N+S,0,0]) 
             UI_WidgetBalloon(b.b, 'Refresh file list')
+
+            b= ClassButtonGrid(self.frame221_files_01,0,4, self.files_encrypt_all, 'E.ALL' ,fg='blue', bg= self.file_list_button_bg, p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',iwidth,E+W+N+S,0,0]) 
+            UI_WidgetBalloon(b.b, 'Encrypt all files')
+
+            b= ClassButtonGrid(self.frame221_files_01,0,5, self.files_decrypt_all, 'D.ALL' ,fg='blue', bg= self.file_list_button_bg, p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',iwidth,E+W+N+S,0,0]) 
+            UI_WidgetBalloon(b.b, 'Decrypt all files')
 
             self.frame221_files.grid_columnconfigure(0, weight=1)
             self.frame221_files_01.grid_columnconfigure(1, weight=1)
@@ -1069,6 +1086,7 @@ class ClassWinTkBase():
                 #VerifyCode = UT_MD5_VerifyCode(EncryptCode)
 
                 to_encrypt = True  
+                to_do = "encrypt"
                 #filex = file + '.' + VerifyCode + '.crpt'  
                 filex = file + '.crpt'  
                 status = 'lock'
@@ -1080,12 +1098,13 @@ class ClassWinTkBase():
                     #    return
 
                     to_encrypt = False
+                    to_do = "decrypt"
                     #filex = re.sub(r'(\.[A-Z0-9]{4}\.crpt)$', '', file, flags=re.I)
                     filex = re.sub(r'\.crpt$', '', file, flags=re.I)
                     tips = "Click to encrypt the file: "
                     status = ''
 
-                print("\tfile to_encrypt=", to_encrypt, filex)
+                print("\t" + to_do + " the file:", filex)
 
                 fdata  = UT_FileOpen(file, format='bytes')
                 ffdata = UT_CryptMe(fdata, key=UT_GetMD5(EncryptCode), isEncript=to_encrypt, dataType='bytes')
@@ -1096,38 +1115,105 @@ class ClassWinTkBase():
                         #self.files_display_list()
                         #return
                     
-                        fsize = round(os.path.getsize(filex)/1024, 2)   #when the file path is deep and every long, will get error and fail to get file size            
-                        ftime = time.strftime("%y-%m-%d %H:%M:%S",time.localtime(os.path.getmtime(filex)))
+                        fsize = round(os.path.getsize(filex)/1024, 2)   #when the file path is deep and every long, will get error and fail to get file size   
+                        if fsize:         
+                            ftime = time.strftime("%y-%m-%d %H:%M:%S",time.localtime(os.path.getmtime(filex)))
 
-                        oid = UT_GetMD5(file)
-                        wids = self.files_display_buttons[oid]   #[row, col, lb2, b3, lb4, lb5, ipay]
-                        row  = wids[0]
-                        ipay = wids[6]
-                        self.files_display_buttons[oid][3].destroy()
+                            oid = UT_GetMD5(file)
+                            wids = self.files_display_buttons[oid]   #[row, col, lb2, b3, lb4, lb5, ipay]
+                            row  = wids[0]
+                            ipay = wids[6]
+                            self.files_display_buttons[oid][3].destroy()
 
-                        nid = UT_GetMD5(filex)
-                        b3  = self.files_list_add_rows(row, filex, tips, ipay, nid)            
-                        self.files_display_buttons[nid] = wids
-                        self.files_display_buttons[nid][3] = b3
-                        self.files_display_buttons[nid][2].config(text = status)
-                        self.files_display_buttons[nid][4].config(text = fsize)
-                        self.files_display_buttons[nid][5].config(text = ftime)
+                            nid = UT_GetMD5(filex)
+                            b3  = self.files_list_add_rows(row, filex, tips, ipay, nid)            
+                            self.files_display_buttons[nid] = wids
+                            self.files_display_buttons[nid][3] = b3
+                            self.files_display_buttons[nid][2].config(text = status)
+                            self.files_display_buttons[nid][4].config(text = fsize)
+                            self.files_display_buttons[nid][5].config(text = ftime)
 
-                        del self.files_display_buttons[oid]
-                        UT_FileDelete(file)
+                            del self.files_display_buttons[oid]
+                            UT_FileDelete(file)
+                        else:
+                            UT_Print2Log('red', "\n", sys._getframe().f_lineno, "!! File size is 0:", filex)
 
                     else:
-                        UT_Print2Log('red', "\n", sys._getframe().f_lineno, "failed to encrypt/decrypt:", filepath)
+                        UT_Print2Log('red', "\n", sys._getframe().f_lineno, "failed to "+to_do+":", filepath)
                 else:
-                    if re.match(r'.*\.crpt$', file, re.I):
-                        messagebox.showwarning(title='Warning!', message="!!! Encrypt Code may not be correct to decrypt this file:\n" + file)
-                    else:
-                        messagebox.showwarning(title='Warning!', message="!!! Encrypt Code my not be not correct to encrypt this file:\n" + file)
-
+                    UT_Print2Log('red', "\n", sys._getframe().f_lineno, "!!! Encrypt Code may not be correct to "+to_do+" this file:\n" + file)
+                    messagebox.showwarning(title='Warning!', message="!!! Encrypt Code may not be correct to "+to_do+" this file:\n" + file)
             else:
                 UT_Print2Log('red', "\n", sys._getframe().f_lineno, "File not existing to encrypt/decrypt:", filepath)
         except:
             UT_Print2Log('red', sys._getframe().f_lineno, traceback.format_exc())
+
+    def files_encrypt_all(self, to_encrypt=True):
+        dir_path = re.sub(r'^\s+|\s+$', '', self.files_folder_path.get())
+        if dir_path and os.path.exists(dir_path):
+            self.files_display_path = dir_path
+            os.chdir(dir_path)
+            EncryptCode = re.sub(r'^\s+|\s+$', '', self.var_EncryptCode.get())
+
+            n = 0
+            k = 0
+            fail_to_do = []
+            to_do = "encrypt"
+            if not to_encrypt:
+                to_do = "decrypt"
+
+            for f in sorted(glob.glob("*")): 
+                if (f == '.') or (f == '..'):
+                    continue
+                        
+                if not os.path.isdir(os.path.join(self.files_display_path, f)):
+                    try:
+                        ffdata = None
+                        filex  = ""
+                        if to_encrypt:
+                            if not re.match(r'.*\.crpt$', f, re.I):
+                                filex = f + '.crpt'
+                            else:
+                                continue                                
+                        else:                      
+                            if re.match(r'.*\.crpt$', f, re.I):
+                                filex = re.sub(r'\.crpt$', '', f, flags=re.I)
+                            else:
+                                continue
+                        n += 1
+                        UT_Print2Log('blue', "\n", sys._getframe().f_lineno, str(n) +". " + to_do + " the file:", f)
+
+                        fdata  = UT_FileOpen(f, format='bytes')
+                        if fdata:
+                            ffdata = UT_CryptMe(fdata, key=UT_GetMD5(EncryptCode), isEncript=to_encrypt, dataType='bytes')
+                        else:
+                            UT_Print2Log('red', sys._getframe().f_lineno, "!!file has not content:", f)
+                            continue
+
+                        if ffdata and filex:
+                            UT_FileSave(ffdata, filex, format='bytes')
+                            if os.path.exists(filex):
+                                fsize = round(os.path.getsize(filex)/1024, 2)   #when the file path is deep and every long, will get error and fail to get file size  
+                                if fsize:
+                                    UT_FileDelete(f)
+                                    k +=1
+                                else:
+                                    UT_Print2Log('red', "\n", sys._getframe().f_lineno, "!! File size is 0:", filex)
+                            else:
+                                UT_Print2Log('red', "\n", sys._getframe().f_lineno, "failed to "+to_do+":", f)
+                        else:
+                            UT_Print2Log('red', "\n", sys._getframe().f_lineno, "!!! Encrypt Code may not be correct to "+to_do+" this file:\n" + f)
+                            fail_to_do.append(f)
+                    except:
+                        UT_Print2Log('red', sys._getframe().f_lineno, traceback.format_exc())
+            if k:
+                self.files_display_list()
+            
+            if len(fail_to_do):
+                messagebox.showwarning(title='Warning!', message="!!! Encrypt Code may not be correct to "+to_do+" this files ("+ str(len(fail_to_do))+"):\n\n-- " + "\n-- ".join(fail_to_do))
+        
+    def files_decrypt_all(self,):
+        self.files_encrypt_all(to_encrypt=False)
 
     def files_list_show(self):
         if self.ClassScrollableFrame_files_show:
@@ -1388,230 +1474,6 @@ class ClassWinTkBase():
         SaveLog(logFile='', isMainWin=True)
         os._exit(0) 
 
-class ClassMouseClickWatcher():
-    def __init__(self,x,y):
-        WindX['load_times'].append([time.time(), 'MouseClickWatcher loading: ...'])
-
-        scale = UI_DeviceDisplayScale(x=x, needScaled=True)
-        dx = int(100*scale)
-        dy = int(15*scale)
-        sizes = [dx*3, dy*2]
-        xys   = [x-dx*2 - 2, y-dy]
-
-        self.isDisplay = True
-        self.x0 = x
-        self.y0 = y
-        self.tl = None
-        self.action = ""
-
-        if WindX['TopLevel_MessageAction']:
-            try:
-                WindX['TopLevel_MessageAction'].destroy()
-                WindX['TopLevel_MessageAction'] = None            
-            except:
-                pass
-
-        if self.isDisplay:
-            UI_ToplevelRect(sizes, xys, icolor='#FF6666')  #F6F6F6
-        try:       
-            self.im_PIL,err = UT_ScreenShotXY(width=sizes[0],height=sizes[1],xSrc=xys[0],ySrc=xys[1])
-            self.OCR_Run()
-        except:
-            UT_Print2Log('red', sys._getframe().f_lineno, traceback.format_exc())
-            UI_ToplevelRectHide()    
-    
-    def OCR_Run(self, ):
-        self.sstime = time.time()
-
-        self.results = {
-            'image_to_boxes':None,
-            'image_to_data':None,
-            'image_to_string': [],
-            'image_data_paddle': [],
-            'result_parsed': []
-        }
-
-        is_to_crop_class = False
-        try:       
-            if self.im_PIL:
-                sizes  = self.im_PIL.size
-                pixels = sizes[0]*sizes[1]
-
-                output=BytesIO()
-                self.im_PIL.save(output, format='PNG')
-                im = Image.open(output)
-                #byte_data = output.getvalue()         
-                UT_Print2Log('', "\nImage ORC\n--------------------------------------------\nimage.size=", im.size)    
-
-                if not WindX['win_ocr_PaddleOCR']:
-                    WindX['win_ocr_PaddleOCR'] = PaddleOCR_Load()
-                try:
-                    stime = time.time()
-                    iOCR = PaddleOCR_Class(PaddleOCR=WindX['win_ocr_PaddleOCR'], im=im, is_to_crop=is_to_crop_class)
-                    iOCR.run()
-                    """
-                    iOCR.results as:
-                        self.results = {
-                            'image_to_string': [],  #all text in block
-                            'image_data_paddle': [],  #all lines [[box1, text1, probability1], [box2, text2, probability2], ...]
-                            'result_parsed': [] #all text in sequency
-                        }
-                    """
-                    self.results['image_data_paddle'] = iOCR.results['image_data_paddle']
-                    self.results['image_to_string']   = iOCR.results['image_to_string']
-                    self.results['result_parsed']     = iOCR.results['result_parsed']
-
-                    if not WindX['win_ocr_used_time'].__contains__('PaddleOCR'):
-                        WindX['win_ocr_used_time']['PaddleOCR'] = {}
-                    if not WindX['win_ocr_used_time']['PaddleOCR'].__contains__(pixels):
-                        WindX['win_ocr_used_time']['PaddleOCR'][pixels] = []
-
-                    WindX['win_ocr_used_time']['PaddleOCR'][pixels].append([stime, time.time()])
-                except:
-                    UT_Print2Log('red', sys._getframe().f_lineno, "\nTry PaddleOCR and get error:\n" + traceback.format_exc())
-
-                if len(self.results['image_to_string']):
-                    if self.isDisplay:
-                        ocr_result = []
-                        if len(self.results['result_parsed']):
-                            ocr_result = self.results['result_parsed'][0]                
-                        
-                        UI_ClassToplevelMessage("\n".join(ocr_result), 'yellow', 'red', pos=[self.x0, self.y0])
-
-                        if WindX['keyboard_keyAltPress']:
-                            UT_ClipboardInertText("\n".join(ocr_result))                
-
-                        UT_Print2Log('green', "\n".join(ocr_result))
-                        UT_Print2Log('', self.results['image_to_boxes'])
-
-                    self.ReactionPre(''.join(self.results['image_to_string']))
-                #UT_Print2Log('', "\n--------------------------------------------\n")
-                output.close()
-        except:
-            UT_Print2Log('red', sys._getframe().f_lineno, "Try OCR ...,\nand get error:\n" + traceback.format_exc())
-            #messagebox.showwarning(title='OCR Warning', message= "Try OCR ...\nthen get the error:\n\n" + traceback.format_exc())
-
-        UT_Print2Log('', sys._getframe().f_lineno, 'Image_OCR_Result used time:', UT_UsedTime(self.sstime), '\n')
-
-        if self.isDisplay:
-            t1 = threading.Timer(0.01,UI_ToplevelRectHide)
-            t1.start()   
-
-    def ReactionPre(self, text):        
-        if re.match(r'.*Password',text,re.I):
-            self.action = 'show-send-password'
-        elif re.match(r'.*(username|user\s+name|login|logon)',text,re.I):
-            self.action = 'show-username'
-        elif re.match(r'.*answer',text,re.I):
-            self.action = 'show-send-code'
-        self.ReactionGo()
-        
-    def ReactionGo(self):
-        UT_Print2Log('blue', "watch click - action=", self.action)
-        if not self.action:
-            return
-        
-        elif self.action == 'close':
-            try:
-                self.tl.destroy()            
-            except:
-                pass
-            WindX['TopLevel_MessageAction'] = None
-            return
-
-        try:
-            hasButton = 0
-            patterns = {
-                'show-send-password': '(Password|PSW)',
-                'show-username': '(user\s+name|username|\s+ID|Login|\s+name)',
-                'show-send-code': 'code'
-            }
-
-            findstr = ''
-            if patterns.__contains__(self.action):
-                findstr = patterns[self.action]
-
-            if findstr:
-                for irow in WindX['form_widgets']:
-                    field_name = WindX['form_widgets'][irow][0].get()
-                    if re.match(r'.*{}'.format(findstr), field_name, re.I):
-                        go = True
-                        if self.action == 'show-username' and re.match(r'.*{}'.format(patterns['show-send-password']), field_name, re.I):
-                            go = False
-                        if go:
-                            hasButton += 1
-
-            if hasButton == 0:
-                return
-
-            self.tl = Toplevel()
-            WindX['TopLevel_MessageAction'] = self.tl
-
-            dy = 40          
-            pos = win32api.GetCursorPos()
-            self.tl.geometry('+'+ str(pos[0]) +'+' + str(pos[1] + dy))
-            frm = Frame(self.tl,bg='yellow')
-            frm.grid(row=1,column=0,sticky=E+W+S+N,pady=5,padx=5)
-            self.xlbl = Label(frm, text='10', justify=CENTER, relief=FLAT,pady=2,padx=2, bg='yellow', fg='#A0A0A0', width=3)
-            self.xlbl.grid(row=0,column=0,sticky=E+W,pady=1,padx=1)
-            col = 0
-            row = 0
-            if findstr:        
-                delstr = True
-                for irow in WindX['form_widgets']:
-                    field_name = WindX['form_widgets'][irow][0].get()
-
-                    if re.match(r'.*{}'.format(findstr), field_name, re.I):
-                        go = True
-                        if self.action == 'show-username' and re.match(r'.*{}'.format(patterns['show-send-password']), field_name, re.I):
-                            go = False
-                        if go:                        
-                            col += 1
-                            short = WindX['form_widgets'][irow][2].get()
-                            self.ReactionButton(frm, row, col, irow, short, field_name, delstr)
-                            if col >= 4:
-                                row +=1
-                                col = 0
-            
-            UI_WidgetFontSetAtPoint(wid=self.tl, widName="button", point=[self.x0, self.y0])
-            self.tl.wm_attributes('-topmost',1)
-            self.tl.overrideredirect(1)
-            self.tl.update()
-
-            t1 = threading.Timer(0.1,self.ButtonCloseDelay)
-            t1.start()
-        except:
-            UT_Print2Log('red', sys._getframe().f_lineno, traceback.format_exc())    
-
-    def ButtonCloseDelay(self):
-        s = 10
-        while True:
-            time.sleep(1)
-            s = s - 1
-            if s <= 0:
-                break
-            try:
-                self.xlbl.configure(text=s)
-                self.tl.update()
-            except:
-                break
-        
-        self.action = "close"
-        self.ReactionGo()
-
-    def ReactionButton(self, frm, row, col, irow, short, field_name, delstr):
-        bs = ClassButtonGrid(frm,row,col,lambda:self.ReactionButtonGo(irow,delstr),field_name,p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',0,E+W+N+S,1,1], TexAnchor=W)
-        UI_WidgetBalloon(bs.b,  field_name)
-
-    def ReactionButtonGo(self, irow, delstr):
-        PSWaction(irow,"send",delstr=delstr)
-
-        try:
-            WindX['TopLevel_MessageAction'] = None
-            self.tl.destroy()        
-        except:
-            pass    
-
 class ClassMouseListener():
     def __init__(self,):
         WindX['load_times'].append([time.time(), 'MouseListener loading: ...'])
@@ -1637,48 +1499,16 @@ class ClassMouseListener():
                     WindX['mouse_click_last_points'] = []
 
                 if WindX['ClassWin'].var_Click_Watcher.get():
-                    p = threading.Timer(0.001,ClassMouseClickWatcher, args=[x,y])
-                    p.start()
+                    if is_to_load_paddle:
+                        p = threading.Timer(0.001,ClassMouseClickWatcher, args=[x,y,PSWaction, WindX])
+                        p.start()
                 else:
                     UI_ToplevelRectHide()
 
             elif re.match(r'.*middle',str(button),re.I):
-                p = threading.Timer(0.001,ClassMouseClickWatcher, args=[x,y])
-                p.start()
-
-            '''
-            try:
-                if dtime <= 1:
-                    WindX['mouse_last_time_click'][0] = time.time()
-                    if button == mouse.Button.left:
-                        WindX['mouse_last_time_click'][1] +=1
-                        if WindX['mouse_last_time_click'][1] >=3 and WindX['row_shortname'].__contains__('JPSW'):                    
-                            WindX['mouse_last_time_click'] = [time.time(),0,0,0]
-                            print("# send password")
-                            t4 = threading.Timer(0.1,PSWaction,args=[WindX['row_shortname']['JPSW'],"send"])
-                            t4.start()
-
-                    elif button == mouse.Button.middle:
-                        WindX['mouse_last_time_click'][2] +=1
-                        if WindX['mouse_last_time_click'][2] >=3 and  WindX['row_shortname'].__contains__('JWID'):
-                            WindX['mouse_last_time_click'] = [time.time(),0,0,0]
-                            print("# send login ID") 
-                            t4 = threading.Timer(0.1,PSWaction,args=[WindX['row_shortname']['JWID'],"send"])
-                            t4.start()
-
-                    elif button == mouse.Button.right:
-                        WindX['mouse_last_time_click'][3] +=1
-                        if WindX['mouse_last_time_click'][3] >=3 and WindX['row_shortname'].__contains__('JCOD'):
-                            WindX['mouse_last_time_click'] = [time.time(),0,0,0]
-                            print("# send security code")
-                            t4 = threading.Timer(0.1,PSWaction,args=[WindX['row_shortname']['JCOD'],"send"])
-                            t4.start()
-
-                else:
-                    WindX['mouse_last_time_click'] = [time.time(),0,0,0]
-            except:
-                UT_Print2Log('red', sys._getframe().f_lineno, traceback.format_exc())
-            '''  
+                if is_to_load_paddle:
+                    p = threading.Timer(0.001,ClassMouseClickWatcher, args=[x,y,PSWaction, WindX])
+                    p.start()
 
 class ClassKeyboardListener():
     def __init__(self,):
@@ -1804,13 +1634,13 @@ class ClassCheckboxGrid:
 
 class ClassButtonGrid:
     def __init__(self,frm,row=0,col=0,cmd=None,txt='?',fg='blue',bg='#E0E0E0',
-                    colspan=1, width = 0, msg=None, isList=False, TexAnchor = CENTER,
-                    p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',0,E+W+N+S,0,0]):
+                 colspan=1, width = 0, msg=None, isList=False, TexAnchor = CENTER,
+                 p=[LEFT,FLAT,3,1,'#FFFF66','#FFFF99',0,E+W+N+S,0,0]):
 
         if width:
             p[6] = width
 
-        self.b = Button( frm, 
+        self.b = Button( frm,
                     text=txt, 
                     fg=fg,
                     bg=bg,

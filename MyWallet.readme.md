@@ -5,6 +5,7 @@ app constructure
 --- common subroutines: 
     mypyUtils.py
     mypyUtilsUI.py
+    mypyUtilsImage.py
     mypyUtilzip.py
     image_ocr_class2.py
 
