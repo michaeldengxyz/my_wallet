@@ -34,6 +34,6 @@ Tab#2 Notes (TBD)
 
 
 # Revisions History
-7.0 initiation;
-8.0: add new functions to manage encrypted files;
-8.1: disable the functions to catch image to OCR when mouse click in the line#107-109.
+Rev 7.0 initiation; <br />
+Rev 8.0: add new functions to manage encrypted files; <br />
+Rev 8.1: disable the functions to catch image to OCR when mouse click in the line#107-109. <br />
