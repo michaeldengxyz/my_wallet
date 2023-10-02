@@ -33,7 +33,7 @@ Tab#2 Notes (TBD)
 <img src="/MyWallet_encrypt_decrypt_files.png" width=800 />
 
 
-# Revisions History
+# 4. Revisions History
 ## Rev 7.0 initiation; ##
 ## Rev 8.0: add new functions to manage encrypted files; ##
 ## Rev 8.1: disable the functions to catch image to OCR when mouse click in the line#107-109. ##
